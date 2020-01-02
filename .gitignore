@@ -1,0 +1,5 @@
+.computed/
+out/
+results/
+simulations/results/
+*.exe
