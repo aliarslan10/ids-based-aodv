@@ -1,4 +1,5 @@
 .computed/
+.settings/
 out/
 results/
 simulations/results/
