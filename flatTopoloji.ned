@@ -34,8 +34,7 @@ network flatTopoloji
         n[dugumSayisi]: Dugum {
 
             parameters:
-                @display("p=47,30,,1,1;i=old/x_blank,,0;is=vs;r=150,,#EBEBFF");
-                //@display("p=200,150");
+                @display("p=35,20;is=vs;r=70,,#EBEBFF");
         }
 }
 
