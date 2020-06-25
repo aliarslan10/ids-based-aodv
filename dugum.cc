@@ -5,20 +5,33 @@
  *      Author: aliarslan
  */
 
-#include "dugum.h"
 
+#include "ids.h"
+#include "attack.h"
+#include "dugum.h"
+#include "zararli.h"
 
 Define_Module(Dugum);
-
 
 void Dugum::initialize(){ // sadece başlangıçta çalışıyor
 
     flatTopolojiModulu = getModuleByPath("flatTopoloji");
 
+    // ağ konfigurasyonlarini cek
     dugumSayisi = flatTopolojiModulu->par("dugumSayisi");
     kaynak = flatTopolojiModulu->par("kaynak");
     hedef  = flatTopolojiModulu->par("hedef");
     kapsama= flatTopolojiModulu->par("kapsama");
+    paketBoyutu = flatTopolojiModulu->par("paketBoyutu");
+
+    // saldırı konfigurasyonlarını cek
+    saldiriModu = flatTopolojiModulu->par("saldiriModu");
+    string zararlilar = flatTopolojiModulu->par("zararlilar");
+    zararliPaketBoyutu = flatTopolojiModulu->par("zararliPaketBoyutu");
+
+    // savunma degiskenleri
+    savunmaModu = flatTopolojiModulu->par("savunmaModu");
+    alarmSayisi = flatTopolojiModulu->par("alarmSayisi");
 
     /* istringstream türü bir string(dize) okur, ostringstream bir dize yazar ve stringstream dizeyi okur ve yazar.
      * << operatörünü kullanarak bir std::stringstream nesnesine istenilen verilerin nasıl yazılacağını göstermektedir.
@@ -26,26 +39,42 @@ void Dugum::initialize(){ // sadece başlangıçta çalışıyor
      * string ve diğer sayısal türleri arasında kolay dönüşüm yapmak için stringstream kullanılır */
 
 
+    // zararli dugumler omnet.ini dosyasından okunuyor
+    if (saldiriModu == 1) {
+
+        vector<int> zararliDugum;
+        stringstream zararliDugumler(zararlilar);
+
+        for (int i; zararliDugumler >> i;) {
+            zararliDugum.push_back(i);
+            if (zararliDugumler.peek() == ',')
+                zararliDugumler.ignore();
+        }
+
+        for (std::size_t i = 0; i < zararliDugum.size(); i++) {
+            EV << "zararli " << zararliDugum[i] << endl;
+            if(zararliDugum[i] == this->getIndex()){
+                zararli = true;
+                getDisplayString().setTagArg("t", 0, "ZARARLI");
+                getDisplayString().setTagArg("i", 1, "YELLOW");
+            }
+        }
+    }
+
+    //cModule *dugumAltModulu = flatTopolojiModulu->getSubmodule("dugumler");
+    //dugumler = dugumAltModulu->par("")
+
     stringstream topolojiBoyutuX;
     topolojiBoyutuX << flatTopolojiModulu->getDisplayString().getTagArg("bgb",0);
     topolojiBoyutuX >> TOPOLOJI_X; // string değer, integer olan değere atandı.
-
 
     stringstream topolojiBoyutuY;
     topolojiBoyutuY << flatTopolojiModulu->getDisplayString().getTagArg("bgb",1);
     topolojiBoyutuY >> TOPOLOJI_Y;
 
-
-    // her bir düğümün kapsama alanı (topoloji boyutunu geçmeyecek)
-
-//    int maxKapsama = sqrt(double(pow((TOPOLOJI_X), 2) + pow((TOPOLOJI_Y), 2)));
-
-    dugumKoord_X = flatTopolojiModulu->par("posX").doubleValue();
-    dugumKoord_Y = flatTopolojiModulu->par("posY").doubleValue();
-
-
-    EV << "X-TEEESSTT >> " <<  dugumKoord_X << endl;
-    EV << "Y-TEEESSTT >> " <<  dugumKoord_Y << endl;
+    // 3. parametre omnet.ini dosyasında yer alan seed-no. toplam 6tane var.
+    dugumKoord_X = intuniform (5,400,4);
+    dugumKoord_Y = intuniform (5,150,4);
 
     // refresh layout'tan etkilenmemeleri için sabitledik.
     getDisplayString().setTagArg("p", 0, dugumKoord_X);  // x konumunu ayarla
@@ -57,7 +86,7 @@ void Dugum::initialize(){ // sadece başlangıçta çalışıyor
         getDisplayString().setTagArg("t", 0, "HEDEF");
 
 
-   // flatToplojiModulu->handleParameterChange("posX");
+    // flatToplojiModulu->handleParameterChange("posX");
     // flatToplojiModulu->handleParameterChange("posY");
 
     cMessage *baslat = new cMessage("baslat");
@@ -66,13 +95,65 @@ void Dugum::initialize(){ // sadece başlangıçta çalışıyor
     baslat->par("posX") = dugumKoord_X;
     baslat->addPar("posY");
     baslat->par("posY") = dugumKoord_Y;
+    baslat->addPar("paket_boyutu");
+    baslat->par("paket_boyutu") = paketBoyutu;
 
     scheduleAt(simTime()+uniform(0,5), baslat); //kendine mesaj gönderiyor. kendini uyandırıyor.
-
-
 }
 
-void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışıyor
+void Dugum::handleMessage(cMessage *msg){
+
+    if(zararli == true && saldiriModu == 1) {
+        /**
+         * BU KISIM SALDIRI:
+         */
+
+        if(!komsu.empty()) {
+            // DOS Saldırısı: paket içeriği manipule ediliyor
+            int saldirilacakDugum = attack->ddos(komsu, msg);
+            cMessage *dos = new cMessage("DOS");
+            dos->addPar("paket_boyutu");
+            dos->par("paket_boyutu") = zararliPaketBoyutu;
+            EV << "bu muydu " << saldirilacakDugum << endl;
+            yollanacakDugum = flatTopolojiModulu->getSubmodule("dugum", saldirilacakDugum);
+            // DÜĞÜM, AĞIN MESAJI SAĞLIKLI İLETMESİNİ ENGELLEDİ
+            for(int i=0; i<5; i++){
+                cMessage *copyMsg = dos->dup();
+                sendDirect(copyMsg, yollanacakDugum, "girisCikis");
+            }
+            delete msg; // no longer needed
+        }
+
+        // zararlı düğüm mü? eğer evetse:tüm ağa kendini komşu olarak tanıt
+        //attack->helloFlood();
+
+        // zararlı düğüm mü? eğer evetse:tüm trafiği kendi üzerine çek. paketlerin bir kısmı yada tamamını drop et.
+        //attack->sinkhole();
+        //attack->selectiveForwarding();
+        //attack->blackHole();
+
+        /* ======================== SALDIRI END ========================= */
+    } else {
+        /**
+         * BU KISIM SAVUNMA
+         */
+        if(msg != nullptr && savunmaModu == 1){
+            // anti ddos. olması gereken boyutla, paket boyutu parametre olarak gönderiliyor.
+            bool buyukPktBoyutu = ids->paketBoyutunuKontrolEt(paketBoyutu, msg->par("paket_boyutu"));
+
+            if(buyukPktBoyutu){
+                EV << "Saldırı Sayısı " << ++saldiriSayisi << endl;
+                if(alarmSayisi == saldiriSayisi) {
+                    //ids->komsulariUyar();
+                }
+            }
+
+        }
+
+
+        /* ======================== SAVUNMA END ========================= */
+
+    }
 
     if(msg != nullptr){
 
@@ -87,16 +168,16 @@ void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışı
            hello->par("hello_Y") = msg->par("posY").doubleValue();
            hello->addPar("hello_index");
            hello->par("hello_index") = this->getIndex();
-
-           cModule *yollanacak_dugum;
+           hello->addPar("paket_boyutu");
+           hello->par("paket_boyutu") = paketBoyutu;
 
            for (int i = 0; i < dugumSayisi; i++) // sistemdeki dugumlere yollanacak.
            {
-                yollanacak_dugum = flatTopolojiModulu->getSubmodule("n", i);
+               yollanacakDugum = flatTopolojiModulu->getSubmodule("dugum", i);
 
-                sendDirect(hello, yollanacak_dugum, "girisCikis");
+                sendDirect(hello, yollanacakDugum, "girisCikis");
 
-                hello = hello->dup(); // ayn� mesaj iki kere g�nderilemeyece�i i�in dublicate yap�lmas� gerekli.
+                hello = hello->dup(); // aynı mesaj iki kere gönderilmeyeceğinden duplicate yapılması gerekli.
             }
 
         }
@@ -112,18 +193,12 @@ void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışı
             int gelenX = msg->par("hello_X");
             int gelenY = msg->par("hello_Y");
 
-
-          //  EV << "Mesaj Gönderenin X Ekseni :" << gelenX << endl;
-          //  EV << "Mesaj Gönderenin Y Ekseni :" << gelenY << endl;
-
             int uzaklik = kapsamaAlaniHesapla(gelenX,gelenY);
 
             EV <<  "Uzaklık : " << uzaklik       << endl;
             EV <<  "Gönderen Index: " << gonderenIndex << endl;
 
             if(uzaklik < kapsama && gonderenIndex != this->getIndex()){
-
-             //   EV << "INDEX :::: " << this->getIndex() << endl;
 
                 komsu.push_back(gonderenIndex);
 
@@ -162,7 +237,7 @@ void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışı
             if(this->getIndex() != hedef)
                 this->veriGonder();
             else
-                EV << "VERİ BAŞARIYLA ALINDI." << endl;
+                EV << "VERİ BAŞARIYLA ALINDI. GONDEREN KAYNAK: " << kaynak << endl;
         }
 
 
@@ -199,23 +274,27 @@ void Dugum::RREQ(){
     rreq->setHedefSeqNo(1);
     rreq->addPar("dugum_index");
     rreq->par("dugum_index") = this->getIndex();
-
-    cModule *yollanacak_dugum;
-
+    rreq->addPar("paket_boyutu");
+    rreq->par("paket_boyutu") = paketBoyutu;
 
     for (int i = 0; i < komsu.size(); i++) // sistemdeki t�m d���mlere yollanacak.
     {
-       yollanacak_dugum = flatTopolojiModulu->getSubmodule("n", komsu[i]);
+       yollanacakDugum = flatTopolojiModulu->getSubmodule("dugum", komsu[i]);
 
         EV << "Komşu Index : " <<  komsu[i] << endl;
 
 
         //simtime_t propagationDelay = 0.5;
-        //sendDirect(rreq, propagationDelay, SimTime::SimTime(), yollanacak_dugum, "girisCikis");
-        sendDirect(rreq, yollanacak_dugum, "girisCikis");
+        //sendDirect(rreq, propagationDelay, SimTime::SimTime(), yollanacakDugum, "girisCikis");
+        sendDirect(rreq, yollanacakDugum, "girisCikis");
 
-        rreq = rreq->dup(); // ayn� mesaj iki kere g�nderilemeyece�i i�in dublicate yap�lmas� gerekli.
+        rreq = rreq->dup(); // aynı mesaj 2 kere gonderilemeyeceğinden duplicate etmek gerek.
     }
+
+    //cModule *yollanacak_zararli;
+    //yollanacak_zararli = flatTopolojiModulu->getSubmodule("zararli", 1);
+    //EV << "Zararliya gonderiyor : " << endl;
+    //sendDirect(rreq, yollanacak_zararli, "girisCikis");
 }
 
 
@@ -230,7 +309,6 @@ void Dugum::handleRREQ(AODVRREQ *rreq){
         guncelHopSayisi = rreq->getHopCount() + 1;
 
         if(this->getIndex() == hedef){
-
 
             if(hedefHerKomsudanBirRREPalsin < komsu.size()){
 
@@ -331,9 +409,11 @@ void Dugum::RREP(){
     rrep->setHedefSeqNo(2); // Sadece ilk RREP tarafından arttırılabilir.
     rrep->addPar("dugum_index");
     rrep->par("dugum_index") = this->getIndex();
+    rrep->addPar("paket_boyutu");
+    rrep->par("paket_boyutu") = paketBoyutu;
 
-    cModule *yollanacak_dugum = flatTopolojiModulu->getSubmodule("n", geriRotalama["sonraki"]);
-    sendDirect(rrep, yollanacak_dugum, "girisCikis");
+    yollanacakDugum = flatTopolojiModulu->getSubmodule("dugum", geriRotalama["sonraki"]);
+    sendDirect(rrep, yollanacakDugum, "girisCikis");
 
 }
 
@@ -376,9 +456,11 @@ void Dugum::veriGonder(){
     veri->par("dugum_index") = this->getIndex();
     veri->addPar("dugum_id");
     veri->par("dugum_id") = this->getId();
+    veri->addPar("paket_boyutu");
+    veri->par("paket_boyutu") = paketBoyutu;
 
-    cModule *yollanacak_dugum = flatTopolojiModulu->getSubmodule("n", ileriRotalama["sonraki"]);
-    sendDirect(veri, yollanacak_dugum, "girisCikis");
+    yollanacakDugum = flatTopolojiModulu->getSubmodule("dugum", ileriRotalama["sonraki"]);
+    sendDirect(veri, yollanacakDugum, "girisCikis");
 }
 
 
@@ -389,7 +471,6 @@ double Dugum::kapsamaAlaniHesapla(int mesaji_gonderen_dugum_X, int mesaji_gonder
     double y = double(pow(abs(mesaji_gonderen_dugum_Y - dugumKoord_Y), 2));
 
     return sqrt(x + y);
-
 }
 
 

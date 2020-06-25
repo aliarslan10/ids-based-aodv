@@ -4,3 +4,4 @@ out/
 results/
 simulations/results/
 *.exe
+*.driveupload

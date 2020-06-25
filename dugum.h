@@ -24,7 +24,9 @@ using namespace omnetpp;
 using namespace std;
 
 cModule *flatTopolojiModulu;
-
+IDS *ids;
+Attack *attack;
+cModule *yollanacakDugum;
 
 class Dugum : public cSimpleModule{
 
@@ -32,6 +34,7 @@ class Dugum : public cSimpleModule{
         int kaynak;
         int hedef;
         int dugumSayisi;
+        int paketBoyutu;
         int kapsama;
         int TOPOLOJI_X;
         int TOPOLOJI_Y;
@@ -39,6 +42,17 @@ class Dugum : public cSimpleModule{
         int dugumKoord_Y;
         int helloMesajiSayisi = 0;
         int guncelHopSayisi=0, enKucukHop=0, enBuyukHedefSiraNo=0;
+        bool zararli = false;
+
+        // zararli değişkenler
+        int saldiriModu;
+        int zararliPaketBoyutu;
+        int ddosGonderimSayisi;
+        int saldiriSayisi = 0;
+
+        // ids degiskenleri
+        int savunmaModu;
+        int alarmSayisi;
 
         vector<int> komsu;
         map<string, int> geriRotalama;

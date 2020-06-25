@@ -15,40 +15,13 @@
 
 package ali_aodv;
 
-network flatTopoloji
+simple Zararli
 {
     parameters:
-        
-        // ağ değişkenleri
         int dugumSayisi;
-        string zararlilar;
-        int paketBoyutu;
-        int kaynak;
-        int hedef;
-        int kapsama;
-        
-        // zararli degiskenler
-        int saldiriModu;
-        int zararliPaketBoyutu;
-        int ddosGonderimSayisi;
-        
-        // savunma degiskenleri
-        int savunmaModu;
-        int alarmSayisi;
+        int zararliSayisi;
 
-        @display("bgb=500,200");
-
-    submodules:
-        dugum[dugumSayisi]: Dugum {
-
-            parameters:
-                @display("p=35,20;is=vs;r=70,,#EBEBFF");
-        }
-        
-//        zararli[zararliSayisi]: Zararli {
-//
-//            parameters:
-//                @display("p=35,10;is=vs;r=70,,#EBEBFF");
-//        }
+        @display("i=old/ball2;is=n");
+    gates:
+        input girisCikis @diretIn @loose;
 }
-

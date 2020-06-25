@@ -18,7 +18,7 @@ enum AODVMesajPaketiTipi{
 //cPaket'in tüm özelliklerini miras alan bir sınıf
 packet AODVMesajPaketi {
     
-    unsigned int paketTipi;
+    //unsigned int paketTipi;
     unsigned int xEkseni;
     unsigned int yEkseni;
 }
@@ -26,7 +26,7 @@ packet AODVMesajPaketi {
 
 class AODVRREQ extends AODVMesajPaketi{
 
-	unsigned int paketTipi = RREQ;
+	//unsigned int paketTipi = RREQ;
 	bool joinFlag;		//multicast için
 	bool repairFlag;	//multicast için
 	bool gratuitousRREPFlag; //RREP'nin unicast olması gerekip gerekmediği belirtilir
@@ -45,7 +45,7 @@ class AODVRREQ extends AODVMesajPaketi{
 
 class AODVRREP extends AODVMesajPaketi{
 
-	unsigned int paketTipi = RREP;
+	//unsigned int paketTipi = RREP;
 	bool repairFlag;
 	bool ackRequiredFlag;
 	unsigned int prefixSize;
@@ -61,7 +61,7 @@ class AODVRREP extends AODVMesajPaketi{
 
 class AODVRERR extends AODVMesajPaketi{
 
-	unsigned int paketTipi = RERR;
+	//unsigned int paketTipi = RERR;
 	int hataliDugumler[]; // id, ip, adr
 	int hataliDugumlerSeqNo[];
 	bool noDeleteFlag;
@@ -72,7 +72,7 @@ class AODVRERR extends AODVMesajPaketi{
 
 class AODVRREP_ACK extends AODVMesajPaketi{
 
-	unsigned int paketTipi = RREP_ACK;
+	//unsigned int paketTipi = RREP_ACK;
 
 }
 
