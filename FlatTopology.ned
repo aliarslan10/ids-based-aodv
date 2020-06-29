@@ -13,15 +13,12 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-package ali_aodv;
+package aliaodv;
 
-network flatTopoloji
+network FlatTopology
 {
     parameters:
-
-		// int n @prompt("Number of nodes") = default(10);
-
-        int dugumSayisi;
+        int nodeSayisi;
         int kaynak;
         int hedef;
         int kapsama;
@@ -31,7 +28,7 @@ network flatTopoloji
         @display("bgb=700,300");
 
     submodules:
-        n[dugumSayisi]: Dugum {
+        nodes[nodeSayisi]: Node {
 
             parameters:
                 @display("p=35,20;is=vs;r=70,,#EBEBFF");

@@ -13,12 +13,12 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-package ali_aodv;
+package aliaodv;
 
-simple Dugum
+simple Node
 {
     parameters:
-        int dugumSayisi;
+        int nodeSayisi;
         bool askGratuitousRREP = default(false); //RFC 3561: 6.6.3 (gereksiz RREP hedef düğüme giden yolda bir sonraki atlamaya gönderilir, sanki hedef düğüm kaynak düğüm için bir RREQ yayınlamış gibi ve bu RREP,  (hayali) RREQ'ye yanıt olarak üretilmiştir.)
         bool useHelloMessages = default(false); // RFC 3561: 6.9
         bool useLocalRepair = default(false); //   RFC 3561: 6.12 (ihtiyac duyularsa yapilacak)
@@ -27,7 +27,7 @@ simple Dugum
 
         @display("i=block/circle");
     gates:
-        input girisCikis @diretIn @loose;
+        input gate @diretIn @loose;
 	    // @loose : çalışma esnasında hatayı engellemek için bağlantı kontrolünü kapatıyor. (allowunconnected anahtar kelimesi gibi) 
 	    // @directIn : sendDirect() ile mesaj alabilmek için var olan giriş kapıları ile belirtilir.
 }

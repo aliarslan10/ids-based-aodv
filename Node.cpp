@@ -1,55 +1,44 @@
 /*
- * dugum.cc
+ * dugum.cpp
  *
  *  Created on: Apr 27, 2018
- *      Author: aliarslan
+ *  Author: aliarslan
  */
 
-#include "dugum.h"
+#include "Node.h"
 
+Define_Module(Node);
 
-Define_Module(Dugum);
+void Node::initialize(){ // sadece başlangıçta çalışıyor
 
+    flatTopologyModule = getModuleByPath("FlatTopology");
 
-void Dugum::initialize(){ // sadece başlangıçta çalışıyor
-
-    flatTopolojiModulu = getModuleByPath("flatTopoloji");
-
-    dugumSayisi = flatTopolojiModulu->par("dugumSayisi");
-    kaynak = flatTopolojiModulu->par("kaynak");
-    hedef  = flatTopolojiModulu->par("hedef");
-    kapsama= flatTopolojiModulu->par("kapsama");
-
-    /* istringstream türü bir string(dize) okur, ostringstream bir dize yazar ve stringstream dizeyi okur ve yazar.
-     * << operatörünü kullanarak bir std::stringstream nesnesine istenilen verilerin nasıl yazılacağını göstermektedir.
-     * >> işleci kullanılarak bir std::stringstream nesnesinden biçimlendirilmiş verilerin nasıl okunacağını gösterir.
-     * string ve diğer sayısal türleri arasında kolay dönüşüm yapmak için stringstream kullanılır */
-
+    nodeSayisi = flatTopologyModule->par("nodeSayisi");
+    kaynak = flatTopologyModule->par("kaynak");
+    hedef  = flatTopologyModule->par("hedef");
+    kapsama= flatTopologyModule->par("kapsama");
 
     stringstream topolojiBoyutuX;
-    topolojiBoyutuX << flatTopolojiModulu->getDisplayString().getTagArg("bgb",0);
-    topolojiBoyutuX >> TOPOLOJI_X; // string değer, integer olan değere atandı.
-
+    topolojiBoyutuX << flatTopologyModule->getDisplayString().getTagArg("bgb",0);
+    topolojiBoyutuX >> topolojiX; // string değer, integer olan değere atandı.
 
     stringstream topolojiBoyutuY;
-    topolojiBoyutuY << flatTopolojiModulu->getDisplayString().getTagArg("bgb",1);
-    topolojiBoyutuY >> TOPOLOJI_Y;
+    topolojiBoyutuY << flatTopologyModule->getDisplayString().getTagArg("bgb",1);
+    topolojiBoyutuY >> topolojiY;
 
 
-    // her bir düğümün kapsama alanı (topoloji boyutunu geçmeyecek)
+    // node kapsama alanı topoloji boyutunu geçmeyecek
+    // int maxKapsama = sqrt(double(pow((TOPOLOJI_X), 2) + pow((TOPOLOJI_Y), 2)));
 
-//    int maxKapsama = sqrt(double(pow((TOPOLOJI_X), 2) + pow((TOPOLOJI_Y), 2)));
+    nodeKordinatX = flatTopologyModule->par("posX").doubleValue();
+    nodeKordinatY = flatTopologyModule->par("posY").doubleValue();
 
-    dugumKoord_X = flatTopolojiModulu->par("posX").doubleValue();
-    dugumKoord_Y = flatTopolojiModulu->par("posY").doubleValue();
-
-
-    EV << "X-TEEESSTT >> " <<  dugumKoord_X << endl;
-    EV << "Y-TEEESSTT >> " <<  dugumKoord_Y << endl;
+    EV << "X-TEEESSTT >> " <<  nodeKordinatX << endl;
+    EV << "Y-TEEESSTT >> " <<  nodeKordinatY << endl;
 
     // refresh layout'tan etkilenmemeleri için sabitledik.
-    getDisplayString().setTagArg("p", 0, dugumKoord_X);  // x konumunu ayarla
-    getDisplayString().setTagArg("p", 1, dugumKoord_Y);  // y konumunu ayarla
+    getDisplayString().setTagArg("p", 0, nodeKordinatX);  // x konumunu ayarla
+    getDisplayString().setTagArg("p", 1, nodeKordinatY);  // y konumunu ayarla
 
     if(this->getIndex() == kaynak)
         getDisplayString().setTagArg("t", 0, "KAYNAK");
@@ -57,46 +46,43 @@ void Dugum::initialize(){ // sadece başlangıçta çalışıyor
         getDisplayString().setTagArg("t", 0, "HEDEF");
 
 
-   // flatToplojiModulu->handleParameterChange("posX");
-    // flatToplojiModulu->handleParameterChange("posY");
+   // flatToplojiModulu->handleParameterChange("POSX");
+    // flatToplojiModulu->handleParameterChange("POSY");
 
-    cMessage *baslat = new cMessage("baslat");
+    cMessage *baslat = new cMessage("BASLAT");
 
-    baslat->addPar("posX");
-    baslat->par("posX") = dugumKoord_X;
-    baslat->addPar("posY");
-    baslat->par("posY") = dugumKoord_Y;
+    baslat->addPar("POSX");
+    baslat->par("POSX") = nodeKordinatX;
+    baslat->addPar("POSY");
+    baslat->par("POSY") = nodeKordinatY;
 
-    scheduleAt(simTime()+uniform(0,5), baslat); //kendine mesaj gönderiyor. kendini uyandırıyor.
-
-
+    // self msg. start node
+    scheduleAt(simTime()+uniform(0,5), baslat);
 }
 
-void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışıyor
+void Node::handleMessage(cMessage *msg){
 
     if(msg != nullptr){
 
-        if (strcmp(msg->getName(), "baslat") == 0){
+        if (strcmp(msg->getName(), "BASLAT") == 0){
 
            EV << "Hello Mesajı İle Komşular Belirleniyor.." << endl;
 
-           cMessage *hello = new cMessage("hello");
-           hello->addPar("hello_X");
-           hello->par("hello_X") = msg->par("posX").doubleValue();
-           hello->addPar("hello_Y");
-           hello->par("hello_Y") = msg->par("posY").doubleValue();
-           hello->addPar("hello_index");
-           hello->par("hello_index") = this->getIndex();
+           cMessage *hello = new cMessage("HELLO");
+           hello->addPar("HELLO_X");
+           hello->par("HELLO_X") = msg->par("POSX").doubleValue();
+           hello->addPar("HELLO_Y");
+           hello->par("HELLO_Y") = msg->par("POSY").doubleValue();
+           hello->addPar("HELLO_INDEX");
+           hello->par("HELLO_INDEX") = this->getIndex();
 
-           cModule *yollanacak_dugum;
+           cModule *yollanacakDugum;
 
-           for (int i = 0; i < dugumSayisi; i++) // sistemdeki dugumlere yollanacak.
+           for (int i = 0; i < nodeSayisi; i++) // sistemdeki dugumlere yollanacak.
            {
-                yollanacak_dugum = flatTopolojiModulu->getSubmodule("n", i);
-
-                sendDirect(hello, yollanacak_dugum, "girisCikis");
-
-                hello = hello->dup(); // ayn� mesaj iki kere g�nderilemeyece�i i�in dublicate yap�lmas� gerekli.
+                yollanacakDugum = flatTopologyModule->getSubmodule("nodes", i);
+                sendDirect(hello, yollanacakDugum, "gate");
+                hello = hello->dup();
             }
 
         }
@@ -104,13 +90,13 @@ void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışı
 
         /* ########## HELLO MESAJLARI İLE KOMŞU BUL ########## */
 
-        if (strcmp(msg->getName(), "hello") == 0 && this->getIndex() != msg->par("hello_index").doubleValue()){
+        if (strcmp(msg->getName(), "HELLO") == 0 && this->getIndex() != msg->par("HELLO_INDEX").doubleValue()){
 
-            //EV << "Benim X : " <<  dugumKoord_X << " - Benim Y : " << dugumKoord_Y << endl;
+            //EV << "Benim X : " <<  nodeKordinatX << " - Benim Y : " << nodeKordinatY << endl;
 
-            int gonderenIndex = msg->par("hello_index");
-            int gelenX = msg->par("hello_X");
-            int gelenY = msg->par("hello_Y");
+            int gonderenIndex = msg->par("HELLO_INDEX");
+            int gelenX = msg->par("HELLO_X");
+            int gelenY = msg->par("HELLO_Y");
 
 
           //  EV << "Mesaj Gönderenin X Ekseni :" << gelenX << endl;
@@ -129,7 +115,7 @@ void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışı
 
                 for(int i=1; i<komsu.size(); i++){
 
-                    EV << "Düğüm INDEX komsu[i] = " <<  komsu[i] << endl;
+                    EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
                 }
             }
 
@@ -137,14 +123,12 @@ void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışı
 
                 helloMesajiSayisi++;
 
-                if(helloMesajiSayisi == dugumSayisi-1){ // tüm komşulardan alana kadar, kendisi hariç
-
+                if(helloMesajiSayisi == nodeSayisi-1){ // tüm komşulardan alana kadar, kendisi hariç
 
                     EV << "ROTA KEŞFİ BAŞLATILIYOR..." << endl << endl;
-                    rreq_id  = uniform(0,999); // ilk atama burada yapılıyor
+                    rreqId  = uniform(0,999); // ilk atama burada yapılıyor
                     scheduleStart(simTime()+uniform(500,1000));
                     RREQ();
-
                 }
 
             }
@@ -153,11 +137,11 @@ void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışı
 
         /* ########## VERİ GÖNDER ########## */
 
-        if(strcmp(msg->getName(), "veri") == 0){
+        if(strcmp(msg->getName(), "DATA") == 0){
 
             EV << "VERİ ALINDI" << endl;
-            EV << "GONDEREN ID   : "<< msg->par("dugum_id").doubleValue() << endl;
-            EV << "GONDEREN INDEX: "<< msg->par("dugum_index").doubleValue() << endl;
+            EV << "GONDEREN ID   : "<< msg->par("NODE_ID").doubleValue() << endl;
+            EV << "GONDEREN INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
 
             if(this->getIndex() != hedef)
                 this->veriGonder();
@@ -181,51 +165,48 @@ void Dugum::handleMessage(cMessage *msg){ // burası bir döngü gibi çalışı
              //handleRREP(dynamic_cast<AODVRREP*>(msg));
 
          //throw cRuntimeError("tanımsız paket");
-
     }
 
 }
 
 
-void Dugum::RREQ(){
+void Node::RREQ(){
 
     EV << "RREQ Gönderiliyor..." << endl;
 
     AODVRREQ *rreq = new AODVRREQ("RREQ");
     rreq->setKaynakAdr(kaynak);
-    rreq->setRreq_id(rreq_id);
+    rreq->setRreqId(rreqId);
     rreq->setHedefAdr(hedef);
     rreq->setHopCount(guncelHopSayisi);
     rreq->setHedefSeqNo(1);
-    rreq->addPar("dugum_index");
-    rreq->par("dugum_index") = this->getIndex();
+    rreq->addPar("NODE_INDEX");
+    rreq->par("NODE_INDEX") = this->getIndex();
 
-    cModule *yollanacak_dugum;
-
+    cModule *yollanacakDugum;
 
     for (int i = 0; i < komsu.size(); i++) // sistemdeki t�m d���mlere yollanacak.
     {
-       yollanacak_dugum = flatTopolojiModulu->getSubmodule("n", komsu[i]);
+       yollanacakDugum = flatTopologyModule->getSubmodule("nodes", komsu[i]);
 
         EV << "Komşu Index : " <<  komsu[i] << endl;
 
 
         //simtime_t propagationDelay = 0.5;
-        //sendDirect(rreq, propagationDelay, SimTime::SimTime(), yollanacak_dugum, "girisCikis");
-        sendDirect(rreq, yollanacak_dugum, "girisCikis");
-
+        //sendDirect(rreq, propagationDelay, SimTime::SimTime(), yollanacakDugum, "girisCikis");
+        sendDirect(rreq, yollanacakDugum, "gate");
         rreq = rreq->dup(); // ayn� mesaj iki kere g�nderilemeyece�i i�in dublicate yap�lmas� gerekli.
     }
 }
 
 
-void Dugum::handleRREQ(AODVRREQ *rreq){
+void Node::handleRREQ(AODVRREQ *rreq){
 
     //AODVRREQ *rreq = dynamic_cast<AODVRREQ*> (msg);
 
     if (rreq != nullptr) {
 
-        EV << "Broadcast Mesajı Geldi. Gönderen Index : " << rreq->par("dugum_index").doubleValue() << endl;
+        EV << "Broadcast Mesaj. Gönderen Index : " << rreq->par("NODE_INDEX").doubleValue() << endl;
 
         guncelHopSayisi = rreq->getHopCount() + 1;
 
@@ -236,7 +217,7 @@ void Dugum::handleRREQ(AODVRREQ *rreq){
 
                 hedefHerKomsudanBirRREPalsin++;
 
-                EV << "###### HEDEF DÜĞÜME GELEN PAKETLER KARŞILAŞTIRILIYOR! ######" << endl;
+                EV << "###### HEDEF NodeE GELEN PAKETLER KARŞILAŞTIRILIYOR! ######" << endl;
 
                 if(enKucukHop > guncelHopSayisi || enKucukHop == 0){
 
@@ -246,7 +227,7 @@ void Dugum::handleRREQ(AODVRREQ *rreq){
                     geriRotalama["hedef"]       = rreq->getHedefAdr();
                     geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
                     geriRotalama["hopSayisi"]   = enKucukHop;
-                    geriRotalama["sonraki"]     = rreq->par("dugum_index").doubleValue();
+                    geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
                     geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
 
                 }else if(enBuyukHedefSiraNo < rreq->getHedefSeqNo()) {
@@ -257,14 +238,14 @@ void Dugum::handleRREQ(AODVRREQ *rreq){
                     geriRotalama["hedef"]       = rreq->getHedefAdr();
                     geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
                     geriRotalama["hopSayisi"]   = guncelHopSayisi;
-                    geriRotalama["sonraki"]     = rreq->par("dugum_index").doubleValue();
+                    geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
                     geriRotalama["hedefSeqNo"]  = enBuyukHedefSiraNo;
 
                 }else{}
 
                 for(int i=0; i<komsu.size(); i++){
 
-                  EV << "Düğüm INDEX komsu[i] = " <<  komsu[i] << endl;
+                  EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
                 }
 
                 EV << "HEDEF GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
@@ -273,10 +254,10 @@ void Dugum::handleRREQ(AODVRREQ *rreq){
                 EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
                 EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
 
-                if(hedefHerKomsudanBirRREPalsin == komsu.size()){ // düğüm seçimi tamamlandıktan sonra burası çalışacak
+                if(hedefHerKomsudanBirRREPalsin == komsu.size()){ // Node seçimi tamamlandıktan sonra burası çalışacak
 
                     EV << "###### GERİ ROTALAMA TAMAMLANDI! ######" << endl << "-------------------------" << endl;
-                    EV << "İlk RREP Gönderilecek Düğümün Index Bilgisi : " << geriRotalama["sonraki"] << endl;
+                    EV << "İlk RREP Gönderilecek Nodeün Index Bilgisi : " << geriRotalama["sonraki"] << endl;
 
                     this->RREP(); // hedef ilk RREP mesajını buradan tetikliyor.
                     //endSimulation();
@@ -285,19 +266,18 @@ void Dugum::handleRREQ(AODVRREQ *rreq){
             }else{}
 
 
-
         }else{
 
-           if(rreq_id != rreq->getRreq_id() && this->getIndex() != kaynak){
+           if(rreqId != rreq->getRreqId() && this->getIndex() != kaynak){
 
                 geriRotalama["kaynak"]      = rreq->getKaynakAdr();
                 geriRotalama["hedef"]       = rreq->getHedefAdr();
                 geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
                 geriRotalama["hopSayisi"]   = guncelHopSayisi;
-                geriRotalama["sonraki"]     = rreq->par("dugum_index");
+                geriRotalama["sonraki"]     = rreq->par("NODE_INDEX");
                 geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
 
-                EV << "ARA DÜĞÜM GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
+                EV << "ARA Node GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
                 EV << "KAYNAK  INDEX:" << geriRotalama["kaynak"] << endl;
                 EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
                 EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
@@ -305,14 +285,14 @@ void Dugum::handleRREQ(AODVRREQ *rreq){
 
                 EV << "Rota tablosunu oluşturdum. Ben de aynı mesajı broadcast ediyorum..." << endl;
 
-                rreq_id = rreq->getRreq_id();
+                rreqId = rreq->getRreqId();
                 this->RREQ();
 
 
            }else{
 
-               //EV << "Bu broadcast beni ilgilendirmiyor : kaynak düğüm veya daha önceden alınan bir broadcast" << endl;
-               //EV << "RREQ ID Global : " << rreq_id << endl << "Paketle gelen RREQ ID : " << rreq->getRreq_id() << endl;
+               //EV << "Bu broadcast beni ilgilendirmiyor : kaynak Node veya daha önceden alınan bir broadcast" << endl;
+               //EV << "RREQ ID Global : " << rreqId << endl << "Paketle gelen RREQ ID : " << rreq->getRreqId() << endl;
            }
         }
 
@@ -320,7 +300,7 @@ void Dugum::handleRREQ(AODVRREQ *rreq){
 }
 
 
-void Dugum::RREP(){
+void Node::RREP(){
 
     EV << "RREP Gönderiliyor..." << endl;
 
@@ -329,15 +309,15 @@ void Dugum::RREP(){
     rrep->setHedefAdr(kaynak);
     rrep->setHopCount(guncelHopSayisi);
     rrep->setHedefSeqNo(2); // Sadece ilk RREP tarafından arttırılabilir.
-    rrep->addPar("dugum_index");
-    rrep->par("dugum_index") = this->getIndex();
+    rrep->addPar("NODE_INDEX");
+    rrep->par("NODE_INDEX") = this->getIndex();
 
-    cModule *yollanacak_dugum = flatTopolojiModulu->getSubmodule("n", geriRotalama["sonraki"]);
-    sendDirect(rrep, yollanacak_dugum, "girisCikis");
+    cModule *yollanacakDugum = flatTopologyModule->getSubmodule("nodes", geriRotalama["sonraki"]);
+    sendDirect(rrep, yollanacakDugum, "gate");
 
 }
 
-void Dugum::handleRREP(AODVRREP *rrep){
+void Node::handleRREP(AODVRREP *rrep){
 
     // AODVRREP *rrep = dynamic_cast<AODVRREP*>(msg);
 
@@ -350,46 +330,38 @@ void Dugum::handleRREP(AODVRREP *rrep){
             ileriRotalama["hedef"]       = rrep->getKaynakAdr();
             ileriRotalama["hedefSeqNo"]  = rrep->getHedefSeqNo();
             ileriRotalama["hopSayisi"]   = guncelHopSayisi;
-            ileriRotalama["sonraki"]     = rrep->par("dugum_index");
+            ileriRotalama["sonraki"]     = rrep->par("NODE_INDEX");
 
             RREP();
 
-        }else{
-
+        } else {
             ileriRotalama["kaynak"]      = rrep->getHedefAdr();
             ileriRotalama["hedef"]       = rrep->getKaynakAdr();
             ileriRotalama["hedefSeqNo"]  = rrep->getHedefSeqNo();
             ileriRotalama["hopSayisi"]   = guncelHopSayisi;
-            ileriRotalama["sonraki"]     = rrep->par("dugum_index");
+            ileriRotalama["sonraki"]     = rrep->par("NODE_INDEX");
 
             EV << "ROTA KEŞFİ TAMAMLANDI. KAYNAK VERİYİ GÖNDERİLİYOR..." << endl;
             this->veriGonder();
-
         }
     }
 }
 
-void Dugum::veriGonder(){
+void Node::veriGonder(){
+    cMessage *veri = new cMessage("DATA");
+    veri->addPar("NODE_INDEX");
+    veri->par("NODE_INDEX") = this->getIndex();
+    veri->addPar("NODE_ID");
+    veri->par("NODE_ID") = this->getId();
 
-    cMessage *veri = new cMessage("veri");
-    veri->addPar("dugum_index");
-    veri->par("dugum_index") = this->getIndex();
-    veri->addPar("dugum_id");
-    veri->par("dugum_id") = this->getId();
-
-    cModule *yollanacak_dugum = flatTopolojiModulu->getSubmodule("n", ileriRotalama["sonraki"]);
-    sendDirect(veri, yollanacak_dugum, "girisCikis");
+    cModule *yollanacakDugum = flatTopologyModule->getSubmodule("nodes", ileriRotalama["sonraki"]);
+    sendDirect(veri, yollanacakDugum, "gate");
 }
 
-
-// herbir düğümün koordinatı ile ile mesajı gönderen düğüm arası olan uzaklık birbirlerinin kapsamaları dahilinde mi?
-double Dugum::kapsamaAlaniHesapla(int mesaji_gonderen_dugum_X, int mesaji_gonderen_dugum_Y){
-
-    double x = double(pow(abs(mesaji_gonderen_dugum_X - dugumKoord_X), 2));
-    double y = double(pow(abs(mesaji_gonderen_dugum_Y - dugumKoord_Y), 2));
-
+double Node::kapsamaAlaniHesapla(int gondericiKordinatX, int gondericiKordinatY){
+    double x = double(pow(abs(gondericiKordinatX - gondericiKordinatX), 2));
+    double y = double(pow(abs(gondericiKordinatY - gondericiKordinatY), 2));
     return sqrt(x + y);
-
 }
 
 

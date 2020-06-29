@@ -5,8 +5,8 @@
  *      Author: aliarslan
  */
 
-#ifndef DUGUM_H_
-#define DUGUM_H_
+#ifndef NODE_H_
+#define NODE_H_
 
 #include <string.h>
 #include <omnetpp.h>
@@ -18,25 +18,24 @@
 #include <map>
 #include <vector>
 
-#include "AODVMesajPaketi_m.h"
+#include "AODVMsgPacket_m.h"
 
 using namespace omnetpp;
 using namespace std;
 
-cModule *flatTopolojiModulu;
+cModule *flatTopologyModule;
 
 
-class Dugum : public cSimpleModule{
-
+class Node : public cSimpleModule{
     private:
         int kaynak;
         int hedef;
-        int dugumSayisi;
+        int nodeSayisi;
         int kapsama;
-        int TOPOLOJI_X;
-        int TOPOLOJI_Y;
-        int dugumKoord_X;
-        int dugumKoord_Y;
+        int topolojiX;
+        int topolojiY;
+        int nodeKordinatX;
+        int nodeKordinatY;
         int helloMesajiSayisi = 0;
         int guncelHopSayisi=0, enKucukHop=0, enBuyukHedefSiraNo=0;
 
@@ -44,7 +43,7 @@ class Dugum : public cSimpleModule{
         map<string, int> geriRotalama;
         map<string, int> ileriRotalama;
 
-        int rreq_id = 0;
+        int rreqId = 0;
         int hedefHerKomsudanBirRREPalsin = 0; // en küçük hop seçimi için
 
     protected:
@@ -58,4 +57,4 @@ class Dugum : public cSimpleModule{
         double kapsamaAlaniHesapla(int mesaji_gonderen_dugum_X, int mesaji_gonderen_dugum_Y);
 };
 
-#endif /* DUGUM_H_ */
+#endif /* NODE_H_ */

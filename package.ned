@@ -1,3 +1,3 @@
-package ali_aodv;
+package aliaodv;
 
 @license(LGPL);

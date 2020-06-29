@@ -1,12 +1,12 @@
 #
-# OMNeT++/OMNEST Makefile for ali-aodv
+# OMNeT++/OMNEST Makefile for aliaodv
 #
 # This file was generated with the command:
-#  opp_makemake -f --deep -o ali-aodv -O out
+#  opp_makemake -f --deep -o aliaodv -O out
 #
 
 # Name of target to be created (-o option)
-TARGET = ali-aodv$(D)$(EXE_SUFFIX)
+TARGET = aliaodv$(D)$(EXE_SUFFIX)
 TARGET_DIR = .
 
 # User interface (uncomment one) (-u option)
@@ -29,12 +29,12 @@ PROJECT_OUTPUT_DIR = out
 PROJECTRELATIVE_PATH =
 O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
-# Object files for local .cc, .msg and .sm files
-OBJS = $O/dugum.o $O/AODVMesajPaketi_m.o
+# Object files for local .cpp, .msg and .sm files
+OBJS = $O/Node.o $O/AODVMsgPacket_m.o
 
 # Message files
 MSGFILES = \
-    AODVMesajPaketi.msg
+    AODVMsgPacket.msg
 
 # SM files
 SMFILES =
@@ -97,20 +97,20 @@ $O/$(TARGET): $(OBJS)  $(wildcard $(EXTRA_OBJS)) Makefile $(CONFIGFILE)
 
 .PHONY: all clean cleanall depend msgheaders smheaders
 
-.SUFFIXES: .cc
+.SUFFIXES: .cpp
 
-$O/%.o: %.cc $(COPTS_FILE) | msgheaders smheaders
+$O/%.o: %.cpp $(COPTS_FILE) | msgheaders smheaders
 	@$(MKPATH) $(dir $@)
 	$(qecho) "$<"
 	$(Q)$(CXX) -c $(CXXFLAGS) $(COPTS) -o $@ $<
 
-%_m.cc %_m.h: %.msg
+%_m.cpp %_m.h: %.msg
 	$(qecho) MSGC: $<
-	$(Q)$(MSGC) -s _m.cc -MD -MP -MF $O/$(basename $<)_m.h.d $(MSGCOPTS) $?
+	$(Q)$(MSGC) -s _m.cpp -MD -MP -MF $O/$(basename $<)_m.h.d $(MSGCOPTS) $?
 
-%_sm.cc %_sm.h: %.sm
+%_sm.cpp %_sm.h: %.sm
 	$(qecho) SMC: $<
-	$(Q)$(SMC) -c++ -suffix cc $(SMCOPTS) $?
+	$(Q)$(SMC) -c++ -suffix cpp $(SMCOPTS) $?
 
 msgheaders: $(MSGFILES:.msg=_m.h)
 
@@ -121,7 +121,7 @@ clean:
 	$(Q)-rm -rf $O
 	$(Q)-rm -f $(TARGET_DIR)/$(TARGET)
 	$(Q)-rm -f $(TARGET_DIR)/$(TARGET:%.dll=%.lib)
-	$(Q)-rm -f $(call opp_rwildcard, . , *_m.cc *_m.h *_sm.cc *_sm.h)
+	$(Q)-rm -f $(call opp_rwildcard, . , *_m.cpp *_m.h *_sm.cpp *_sm.h)
 
 cleanall:
 	$(Q)$(MAKE) -s clean MODE=release
