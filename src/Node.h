@@ -1,7 +1,7 @@
 /*
  * dugum.h
  *
- *  Created on: May 9, 2018
+ *  Created on: Jun 27, 2020
  *      Author: aliarslan
  */
 
@@ -10,21 +10,12 @@
 
 #include <string.h>
 #include <omnetpp.h>
-#include <vector>
-#include <iostream>
-#include <sstream>
-#include <math.h>
-#include <stdio.h>
-#include <map>
-#include <vector>
-
-#include "AODVMsgPacket_m.h"
+#include <unistd.h>
 
 using namespace omnetpp;
 using namespace std;
 
 cModule *flatTopologyModule;
-
 
 class Node : public cSimpleModule{
     private:
@@ -38,6 +29,15 @@ class Node : public cSimpleModule{
         int nodeKordinatY;
         int helloMesajiSayisi = 0;
         int guncelHopSayisi=0, enKucukHop=0, enBuyukHedefSiraNo=0;
+        int rss, zararliRss, esikRss;
+        double delayTime;
+
+        // zararli değişkenler
+        bool zararli = false;
+        int saldiriModu;
+        int zararliPaketBoyutu;
+        int ddosGonderimSayisi;
+        int saldiriSayisi = 0;
 
         vector<int> komsu;
         map<string, int> geriRotalama;
@@ -49,12 +49,14 @@ class Node : public cSimpleModule{
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
+        virtual void handleHello(cMessage *msg);
         virtual void handleRREQ(AODVRREQ *rreq);
         virtual void handleRREP(AODVRREP *rrep);
         void RREQ();
         void RREP();
-        void veriGonder();
-        double kapsamaAlaniHesapla(int mesaji_gonderen_dugum_X, int mesaji_gonderen_dugum_Y);
+        void sendData();
+        void start();
+        void fun();
 };
 
 #endif /* NODE_H_ */

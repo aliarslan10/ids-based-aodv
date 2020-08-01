@@ -30,11 +30,11 @@ PROJECTRELATIVE_PATH =
 O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cpp, .msg and .sm files
-OBJS = $O/Node.o $O/AODVMsgPacket_m.o
+OBJS = $O/src/Node.o $O/src/Util.o $O/src/AODVMsgPacket_m.o
 
 # Message files
 MSGFILES = \
-    AODVMsgPacket.msg
+    src/AODVMsgPacket.msg
 
 # SM files
 SMFILES =

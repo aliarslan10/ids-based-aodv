@@ -19,13 +19,17 @@ network FlatTopology
 {
     parameters:
         int nodeSayisi;
+        string zararlilar;
         int kaynak;
         int hedef;
         int kapsama;
-        volatile double posX = intuniform (100,600);
-        volatile double posY = intuniform (100,200);
+        int saldiriModu;
+        int rss;
+        int zararliRss;
+        int esikRss;
+        double delayTime;
 
-        @display("bgb=700,300");
+        @display("bgb=500,200");
 
     submodules:
         nodes[nodeSayisi]: Node {

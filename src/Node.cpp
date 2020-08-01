@@ -1,22 +1,38 @@
 /*
- * dugum.cpp
+ * node.cpp
  *
- *  Created on: Apr 27, 2018
+ *  Created on: Jun 27, 2020
  *  Author: aliarslan
  */
 
+
+#include "AODVMsgPacket_m.h"
 #include "Node.h"
+#include "Util.h"
 
 Define_Module(Node);
-
-void Node::initialize(){ // sadece başlangıçta çalışıyor
+class Node;
+void Node::initialize(){
 
     flatTopologyModule = getModuleByPath("FlatTopology");
 
+    // omnet.ini config over ned file.
     nodeSayisi = flatTopologyModule->par("nodeSayisi");
     kaynak = flatTopologyModule->par("kaynak");
     hedef  = flatTopologyModule->par("hedef");
     kapsama= flatTopologyModule->par("kapsama");
+    rss = flatTopologyModule->par("rss");
+    zararliRss = flatTopologyModule->par("zararliRss");
+    esikRss = flatTopologyModule->par("esikRss");
+    delayTime = flatTopologyModule->par("delayTime");
+
+    // saldırı konfigurasyonlarını cek
+    saldiriModu = flatTopologyModule->par("saldiriModu");
+    string zararlilar = flatTopologyModule->par("zararlilar");
+
+
+    //cModule *dugumAltModulu = flatTopolojiModulu->getSubmodule("dugumler");
+    //dugumler = dugumAltModulu->par("")
 
     stringstream topolojiBoyutuX;
     topolojiBoyutuX << flatTopologyModule->getDisplayString().getTagArg("bgb",0);
@@ -26,15 +42,9 @@ void Node::initialize(){ // sadece başlangıçta çalışıyor
     topolojiBoyutuY << flatTopologyModule->getDisplayString().getTagArg("bgb",1);
     topolojiBoyutuY >> topolojiY;
 
-
-    // node kapsama alanı topoloji boyutunu geçmeyecek
-    // int maxKapsama = sqrt(double(pow((TOPOLOJI_X), 2) + pow((TOPOLOJI_Y), 2)));
-
-    nodeKordinatX = flatTopologyModule->par("posX").doubleValue();
-    nodeKordinatY = flatTopologyModule->par("posY").doubleValue();
-
-    EV << "X-TEEESSTT >> " <<  nodeKordinatX << endl;
-    EV << "Y-TEEESSTT >> " <<  nodeKordinatY << endl;
+    // 3. parametre omnet.ini dosyasında yer alan seed-no. toplam 6tane var.
+    nodeKordinatX  = intuniform (5,400,4);
+    nodeKordinatY  = intuniform (5,150,4);
 
     // refresh layout'tan etkilenmemeleri için sabitledik.
     getDisplayString().setTagArg("p", 0, nodeKordinatX);  // x konumunu ayarla
@@ -46,17 +56,27 @@ void Node::initialize(){ // sadece başlangıçta çalışıyor
         getDisplayString().setTagArg("t", 0, "HEDEF");
 
 
-   // flatToplojiModulu->handleParameterChange("POSX");
-    // flatToplojiModulu->handleParameterChange("POSY");
+    // flatToplojiModulu->handleParameterChange("posX");
+    // flatToplojiModulu->handleParameterChange("posY");
 
+
+    // zararli dugumler omnet.ini dosyasından okunuyor
+    if (saldiriModu == 1) {
+        setMaliciousNodes(zararlilar, this->getIndex(), zararli, zararliRss, rss);
+        // set colors for nodes:
+        // flatTopologyModule->getDisplayString().setTagArg("t", 0, "ZARARLI");
+        // flatTopologyModule->getDisplayString().setTagArg("i", 1, "YELLOW");
+    }
+
+    start();
+}
+
+void Node::start(){
     cMessage *baslat = new cMessage("BASLAT");
-
     baslat->addPar("POSX");
     baslat->par("POSX") = nodeKordinatX;
     baslat->addPar("POSY");
     baslat->par("POSY") = nodeKordinatY;
-
-    // self msg. start node
     scheduleAt(simTime()+uniform(0,5), baslat);
 }
 
@@ -75,13 +95,19 @@ void Node::handleMessage(cMessage *msg){
            hello->par("HELLO_Y") = msg->par("POSY").doubleValue();
            hello->addPar("HELLO_INDEX");
            hello->par("HELLO_INDEX") = this->getIndex();
+           hello->addPar("HELLO_NODE_ID");
+           hello->par("HELLO_NODE_ID") = this->getId();
+           hello->addPar("RSS");
+           hello->par("RSS") = rss;
+           hello->addPar("SENDING_TIME");
+           hello->par("SENDING_TIME") = simTime().dbl();
 
-           cModule *yollanacakDugum;
+           cModule *node;
 
            for (int i = 0; i < nodeSayisi; i++) // sistemdeki dugumlere yollanacak.
            {
-                yollanacakDugum = flatTopologyModule->getSubmodule("nodes", i);
-                sendDirect(hello, yollanacakDugum, "gate");
+                node = flatTopologyModule->getSubmodule("nodes", i);
+                sendDirect(hello, node, "inputGate");
                 hello = hello->dup();
             }
 
@@ -91,47 +117,30 @@ void Node::handleMessage(cMessage *msg){
         /* ########## HELLO MESAJLARI İLE KOMŞU BUL ########## */
 
         if (strcmp(msg->getName(), "HELLO") == 0 && this->getIndex() != msg->par("HELLO_INDEX").doubleValue()){
+            handleHello(msg);
+        }
 
-            //EV << "Benim X : " <<  nodeKordinatX << " - Benim Y : " << nodeKordinatY << endl;
+        if(strcmp(msg->getName(), "TEST_MSG") == 0){
+            EV << ":::: SUPHELI MESAJI ALDI :::: " << this->getId() << endl;
+            cMessage *testMsgResp = new cMessage("TEST_MSG_RESP");
+            testMsgResp->addPar("TEST_MSG_ID");
+            int msgSenderId =  testMsgResp->par("TEST_MSG_ID");
 
-            int gonderenIndex = msg->par("HELLO_INDEX");
-            int gelenX = msg->par("HELLO_X");
-            int gelenY = msg->par("HELLO_Y");
+            cModule *node = flatTopologyModule->getSubmodule("nodes", msgSenderId);
+
+            EV << "delay" << delayTime << endl;
+            EV << "sim tim - 1"  << simTime().dbl() << endl;
+            usleep(delayTime);
+            EV << "SENDING TIME - 2" << simTime().dbl() << endl;
+            EV << "SENDER" << msgSenderId << endl;
+
+            sendDirect(testMsgResp, node, "inputGate");
+        }
 
 
-          //  EV << "Mesaj Gönderenin X Ekseni :" << gelenX << endl;
-          //  EV << "Mesaj Gönderenin Y Ekseni :" << gelenY << endl;
-
-            int uzaklik = kapsamaAlaniHesapla(gelenX,gelenY);
-
-            EV <<  "Uzaklık : " << uzaklik       << endl;
-            EV <<  "Gönderen Index: " << gonderenIndex << endl;
-
-            if(uzaklik < kapsama && gonderenIndex != this->getIndex()){
-
-             //   EV << "INDEX :::: " << this->getIndex() << endl;
-
-                komsu.push_back(gonderenIndex);
-
-                for(int i=1; i<komsu.size(); i++){
-
-                    EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
-                }
-            }
-
-            if(this->getIndex() == kaynak){
-
-                helloMesajiSayisi++;
-
-                if(helloMesajiSayisi == nodeSayisi-1){ // tüm komşulardan alana kadar, kendisi hariç
-
-                    EV << "ROTA KEŞFİ BAŞLATILIYOR..." << endl << endl;
-                    rreqId  = uniform(0,999); // ilk atama burada yapılıyor
-                    scheduleStart(simTime()+uniform(500,1000));
-                    RREQ();
-                }
-
-            }
+        if(strcmp(msg->getName(), "TEST_MSG_RESP") == 0){
+            EV << "TEST_MSG_RESP -- SUPHELI MSG ATTI --" << endl << endl;
+            EV << "CURRENT TIME" << simTime().dbl() << endl;
         }
 
 
@@ -144,7 +153,7 @@ void Node::handleMessage(cMessage *msg){
             EV << "GONDEREN INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
 
             if(this->getIndex() != hedef)
-                this->veriGonder();
+                this->sendData();
             else
                 EV << "VERİ BAŞARIYLA ALINDI." << endl;
         }
@@ -169,6 +178,70 @@ void Node::handleMessage(cMessage *msg){
 
 }
 
+void Node::handleHello(cMessage *msg){
+
+    int gonderenIndex = msg->par("HELLO_INDEX");
+    int gonderenId = msg->par("HELLO_NODE_ID");
+    int gelenX = msg->par("HELLO_X");
+    int gelenY = msg->par("HELLO_Y");
+    int gelenRss = msg->par("RSS");
+    double sendingTime = msg->par("SENDING_TIME");
+
+    EV <<  "HANDLE HELLO - GELEN RSS: " << gelenRss << endl;
+
+    // esikten buyukse kesin zararli
+    if(gelenRss > esikRss) {
+        EV << "Indexli Düğüm Zararlı" << gonderenIndex << endl;
+        EV << "SENDING TIME" << sendingTime << endl;
+        EV << "CURRENT TIME" << simTime().dbl() << endl;
+
+        EV << "GONDEREN INDEX " << gonderenIndex << endl;
+        EV << "MSG - GONDEREN ID " << gonderenId << endl;
+        EV << "BEN - GET ID " << this->getId() << endl;
+
+    // sadece rssden buyukse süpheli
+    } else if(gelenRss > rss) {
+        EV << ":::: SUPHELI :::: " << this->getId() << endl;
+        cMessage *testMsg = new cMessage("TEST_MSG");
+        testMsg->addPar("TEST_MSG_ID");
+        testMsg->par("TEST_MSG_ID") = this->getId();
+        cModule *node = flatTopologyModule->getSubmodule("nodes", gonderenId);
+        sendDirect(testMsg, node, "inputGate");
+
+    // sıkıntı yok devam et
+    } else {
+
+        int uzaklik = kapsamaAlaniHesapla(gelenX,gelenY);
+
+        EV <<  "Uzaklık : " << uzaklik << endl;
+        EV <<  "Gönderen Index: " << gonderenIndex << endl;
+
+        if(uzaklik < kapsama && gonderenIndex != this->getIndex()){
+
+            komsu.push_back(gonderenIndex);
+
+            for(int i=1; i<komsu.size(); i++){
+
+                EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
+            }
+        }
+
+        if(this->getIndex() == kaynak){
+
+            helloMesajiSayisi++;
+
+            if(helloMesajiSayisi == nodeSayisi-1){ // tüm komşulardan alana kadar, kendisi hariç
+
+                EV << "ROTA KEŞFİ BAŞLATILIYOR..." << endl << endl;
+                rreqId  = uniform(0,999); // ilk atama burada yapılıyor
+                scheduleStart(simTime()+uniform(500,1000));
+                RREQ();
+            }
+
+        }
+    }
+}
+
 
 void Node::RREQ(){
 
@@ -183,19 +256,16 @@ void Node::RREQ(){
     rreq->addPar("NODE_INDEX");
     rreq->par("NODE_INDEX") = this->getIndex();
 
-    cModule *yollanacakDugum;
+    cModule *node;
 
     for (int i = 0; i < komsu.size(); i++) // sistemdeki t�m d���mlere yollanacak.
     {
-       yollanacakDugum = flatTopologyModule->getSubmodule("nodes", komsu[i]);
+       node = flatTopologyModule->getSubmodule("nodes", komsu[i]);
 
         EV << "Komşu Index : " <<  komsu[i] << endl;
 
-
-        //simtime_t propagationDelay = 0.5;
-        //sendDirect(rreq, propagationDelay, SimTime::SimTime(), yollanacakDugum, "girisCikis");
-        sendDirect(rreq, yollanacakDugum, "gate");
-        rreq = rreq->dup(); // ayn� mesaj iki kere g�nderilemeyece�i i�in dublicate yap�lmas� gerekli.
+        sendDirect(rreq, node, "inputGate");
+        rreq = rreq->dup(); // ayni mesaj iki kere gonderilmez duplicate olur.
     }
 }
 
@@ -312,8 +382,8 @@ void Node::RREP(){
     rrep->addPar("NODE_INDEX");
     rrep->par("NODE_INDEX") = this->getIndex();
 
-    cModule *yollanacakDugum = flatTopologyModule->getSubmodule("nodes", geriRotalama["sonraki"]);
-    sendDirect(rrep, yollanacakDugum, "gate");
+    cModule *node = flatTopologyModule->getSubmodule("nodes", geriRotalama["sonraki"]);
+    sendDirect(rrep, node, "inputGate");
 
 }
 
@@ -342,29 +412,21 @@ void Node::handleRREP(AODVRREP *rrep){
             ileriRotalama["sonraki"]     = rrep->par("NODE_INDEX");
 
             EV << "ROTA KEŞFİ TAMAMLANDI. KAYNAK VERİYİ GÖNDERİLİYOR..." << endl;
-            this->veriGonder();
+            this->sendData();
         }
     }
 }
 
-void Node::veriGonder(){
+void Node::sendData(){
     cMessage *veri = new cMessage("DATA");
     veri->addPar("NODE_INDEX");
     veri->par("NODE_INDEX") = this->getIndex();
     veri->addPar("NODE_ID");
     veri->par("NODE_ID") = this->getId();
 
-    cModule *yollanacakDugum = flatTopologyModule->getSubmodule("nodes", ileriRotalama["sonraki"]);
-    sendDirect(veri, yollanacakDugum, "gate");
+    cModule *node = flatTopologyModule->getSubmodule("nodes", ileriRotalama["sonraki"]);
+    sendDirect(veri, node, "inputGate");
 }
-
-double Node::kapsamaAlaniHesapla(int gondericiKordinatX, int gondericiKordinatY){
-    double x = double(pow(abs(gondericiKordinatX - gondericiKordinatX), 2));
-    double y = double(pow(abs(gondericiKordinatY - gondericiKordinatY), 2));
-    return sqrt(x + y);
-}
-
-
 
 
 

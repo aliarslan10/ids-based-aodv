@@ -27,7 +27,8 @@ simple Node
 
         @display("i=block/circle");
     gates:
-        input gate @diretIn @loose;
+        input inputGate @diretIn @loose;
+        output outputGate @diretIn @loose;
 	    // @loose : çalışma esnasında hatayı engellemek için bağlantı kontrolünü kapatıyor. (allowunconnected anahtar kelimesi gibi) 
 	    // @directIn : sendDirect() ile mesaj alabilmek için var olan giriş kapıları ile belirtilir.
 }
