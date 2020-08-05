@@ -23,10 +23,10 @@ network FlatTopology
         int kaynak;
         int hedef;
         int kapsama;
-        int saldiriModu;
+        int attackMode;
         int rss;
         int zararliRss;
-        int esikRss;
+        int thresholdRss;
         double delayTime;
 
         @display("bgb=500,200");

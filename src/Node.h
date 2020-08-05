@@ -29,12 +29,11 @@ class Node : public cSimpleModule{
         int nodeKordinatY;
         int helloMesajiSayisi = 0;
         int guncelHopSayisi=0, enKucukHop=0, enBuyukHedefSiraNo=0;
-        int rss, zararliRss, esikRss;
+        int rss, zararliRss, thresholdRss;
         double delayTime;
 
         // zararli değişkenler
-        bool zararli = false;
-        int saldiriModu;
+        int attackMode;
         int zararliPaketBoyutu;
         int ddosGonderimSayisi;
         int saldiriSayisi = 0;
@@ -56,7 +55,6 @@ class Node : public cSimpleModule{
         void RREP();
         void sendData();
         void start();
-        void fun();
 };
 
 #endif /* NODE_H_ */

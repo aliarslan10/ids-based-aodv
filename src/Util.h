@@ -19,7 +19,7 @@ using namespace std;
 
 class Util {
     public:
-        double kapsamaAlaniHesapla(int msgGonderenX, int msgGonderenY);
-        void setMaliciousNodes(string zararlilar, int nodeIndex, int zararli, int zararliRss, int rss);
-}
+        static double kapsamaAlaniHesapla(int msgGonderenX, int msgGonderenY);
+        static bool getMaliciousNodes(string zararlilar, int nodeIndex, int zararliRss, int rss);
+};
 #endif /* SRC_UTIL_H_ */

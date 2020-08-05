@@ -11,7 +11,7 @@
 #include "Util.h"
 
 Define_Module(Node);
-class Node;
+
 void Node::initialize(){
 
     flatTopologyModule = getModuleByPath("FlatTopology");
@@ -23,16 +23,10 @@ void Node::initialize(){
     kapsama= flatTopologyModule->par("kapsama");
     rss = flatTopologyModule->par("rss");
     zararliRss = flatTopologyModule->par("zararliRss");
-    esikRss = flatTopologyModule->par("esikRss");
+    thresholdRss = flatTopologyModule->par("thresholdRss");
     delayTime = flatTopologyModule->par("delayTime");
+    attackMode = flatTopologyModule->par("attackMode");
 
-    // saldırı konfigurasyonlarını cek
-    saldiriModu = flatTopologyModule->par("saldiriModu");
-    string zararlilar = flatTopologyModule->par("zararlilar");
-
-
-    //cModule *dugumAltModulu = flatTopolojiModulu->getSubmodule("dugumler");
-    //dugumler = dugumAltModulu->par("")
 
     stringstream topolojiBoyutuX;
     topolojiBoyutuX << flatTopologyModule->getDisplayString().getTagArg("bgb",0);
@@ -47,8 +41,8 @@ void Node::initialize(){
     nodeKordinatY  = intuniform (5,150,4);
 
     // refresh layout'tan etkilenmemeleri için sabitledik.
-    getDisplayString().setTagArg("p", 0, nodeKordinatX);  // x konumunu ayarla
-    getDisplayString().setTagArg("p", 1, nodeKordinatY);  // y konumunu ayarla
+    getDisplayString().setTagArg("p", 0, nodeKordinatX);
+    getDisplayString().setTagArg("p", 1, nodeKordinatY);
 
     if(this->getIndex() == kaynak)
         getDisplayString().setTagArg("t", 0, "KAYNAK");
@@ -56,16 +50,14 @@ void Node::initialize(){
         getDisplayString().setTagArg("t", 0, "HEDEF");
 
 
-    // flatToplojiModulu->handleParameterChange("posX");
-    // flatToplojiModulu->handleParameterChange("posY");
-
-
-    // zararli dugumler omnet.ini dosyasından okunuyor
-    if (saldiriModu == 1) {
-        setMaliciousNodes(zararlilar, this->getIndex(), zararli, zararliRss, rss);
-        // set colors for nodes:
-        // flatTopologyModule->getDisplayString().setTagArg("t", 0, "ZARARLI");
-        // flatTopologyModule->getDisplayString().setTagArg("i", 1, "YELLOW");
+    // get malicious and set them in simulation
+    if (attackMode == 1) {
+        string zararlilar = flatTopologyModule->par("zararlilar");
+        bool isMalicious = Util::getMaliciousNodes(zararlilar, this->getIndex(), zararliRss, rss);
+        if(isMalicious) {
+            getDisplayString().setTagArg("t", 0, "ZARARLI");
+            getDisplayString().setTagArg("i", 1, "YELLOW");
+        }
     }
 
     start();
@@ -190,7 +182,7 @@ void Node::handleHello(cMessage *msg){
     EV <<  "HANDLE HELLO - GELEN RSS: " << gelenRss << endl;
 
     // esikten buyukse kesin zararli
-    if(gelenRss > esikRss) {
+    if(gelenRss > thresholdRss) {
         EV << "Indexli Düğüm Zararlı" << gonderenIndex << endl;
         EV << "SENDING TIME" << sendingTime << endl;
         EV << "CURRENT TIME" << simTime().dbl() << endl;
@@ -211,7 +203,7 @@ void Node::handleHello(cMessage *msg){
     // sıkıntı yok devam et
     } else {
 
-        int uzaklik = kapsamaAlaniHesapla(gelenX,gelenY);
+        int uzaklik = Util::kapsamaAlaniHesapla(gelenX,gelenY);
 
         EV <<  "Uzaklık : " << uzaklik << endl;
         EV <<  "Gönderen Index: " << gonderenIndex << endl;

@@ -2,31 +2,34 @@
  * Util.cpp
  *
  *  Created on: 30 Tem 2020
- *      Author: Ali
+ *      Author: Ali Arslan
  */
 
 #include "Util.h"
 
-double kapsamaAlaniHesapla(int gondericiKordinatX, int gondericiKordinatY){
+double Util::kapsamaAlaniHesapla(int gondericiKordinatX, int gondericiKordinatY){
     double x = double(pow(abs(gondericiKordinatX - gondericiKordinatY), 2));
     double y = double(pow(abs(gondericiKordinatY - gondericiKordinatX), 2));
     return sqrt(x + y);
 }
 
-void setMaliciousNodes(string zararlilar, int nodeIndex, int zararli, int zararliRss, int rss) {
-    vector<int> zararliNode;
-    stringstream zararliNodes(zararlilar);
+bool Util::getMaliciousNodes(string maliciousFromConf, int nodeIndex, int maliciousRss, int rss) {
+    vector<int> maliciousNodes;
+    stringstream maliciousNodesFromConfig(maliciousFromConf);
+    bool nodeMaliciousStatus = false;
 
-    for (int i; zararliNodes >> i;) {
-        zararliNode.push_back(i);
-        if (zararliNodes.peek() == ',')
-            zararliNodes.ignore();
+    for (int i; maliciousNodesFromConfig >> i;) {
+        maliciousNodes.push_back(i);
+        if (maliciousNodesFromConfig.peek() == ',')
+            maliciousNodesFromConfig.ignore();
     }
 
-    for (std::size_t i = 0; i < zararliNode.size(); i++) {
-        if(zararliNode[i] == nodeIndex){
-            zararli = true;
-            rss = rss + (std::rand() % (zararliRss - rss + 1));
+    for (int malicious : maliciousNodes) {
+        if(malicious == nodeIndex){
+            nodeMaliciousStatus = true;
+            rss = rss + (std::rand() % (maliciousRss - rss + 1));
         }
     }
+
+    return nodeMaliciousStatus;
 }
