@@ -22,7 +22,7 @@ network FlatTopology
         string zararlilar;
         int kaynak;
         int hedef;
-        int kapsama;
+        int radius;
         int attackMode;
         int rss;
         int zararliRss;
@@ -35,7 +35,7 @@ network FlatTopology
         nodes[nodeSayisi]: Node {
 
             parameters:
-                @display("p=35,20;is=vs;r=70,,#EBEBFF");
+                @display("p=35,20;is=vs;r=0,,white");
         }
 }
 

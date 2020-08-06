@@ -17,12 +17,14 @@ using namespace std;
 
 cModule *flatTopologyModule;
 
+const int RANDOM_NUMBER_GENERATOR = 2; // omnet.ini seed number
+
 class Node : public cSimpleModule{
     private:
         int kaynak;
         int hedef;
         int nodeSayisi;
-        int kapsama;
+        int radius;
         int topolojiX;
         int topolojiY;
         int nodeKordinatX;
@@ -31,8 +33,6 @@ class Node : public cSimpleModule{
         int guncelHopSayisi=0, enKucukHop=0, enBuyukHedefSiraNo=0;
         int rss, zararliRss, thresholdRss;
         double delayTime;
-
-        // zararli değişkenler
         int attackMode;
         int zararliPaketBoyutu;
         int ddosGonderimSayisi;

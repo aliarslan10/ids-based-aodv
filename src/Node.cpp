@@ -15,18 +15,15 @@ Define_Module(Node);
 void Node::initialize(){
 
     flatTopologyModule = getModuleByPath("FlatTopology");
-
-    // omnet.ini config over ned file.
     nodeSayisi = flatTopologyModule->par("nodeSayisi");
     kaynak = flatTopologyModule->par("kaynak");
     hedef  = flatTopologyModule->par("hedef");
-    kapsama= flatTopologyModule->par("kapsama");
+    radius= flatTopologyModule->par("radius");
     rss = flatTopologyModule->par("rss");
     zararliRss = flatTopologyModule->par("zararliRss");
     thresholdRss = flatTopologyModule->par("thresholdRss");
     delayTime = flatTopologyModule->par("delayTime");
     attackMode = flatTopologyModule->par("attackMode");
-
 
     stringstream topolojiBoyutuX;
     topolojiBoyutuX << flatTopologyModule->getDisplayString().getTagArg("bgb",0);
@@ -37,25 +34,24 @@ void Node::initialize(){
     topolojiBoyutuY >> topolojiY;
 
     // 3. parametre omnet.ini dosyasında yer alan seed-no. toplam 6tane var.
-    nodeKordinatX  = intuniform (5,400,4);
-    nodeKordinatY  = intuniform (5,150,4);
-
-    // refresh layout'tan etkilenmemeleri için sabitledik.
+    nodeKordinatX  = intuniform (5,400,RANDOM_NUMBER_GENERATOR);
+    nodeKordinatY  = intuniform (5,150,RANDOM_NUMBER_GENERATOR);
     getDisplayString().setTagArg("p", 0, nodeKordinatX);
     getDisplayString().setTagArg("p", 1, nodeKordinatY);
+    getDisplayString().setTagArg("r", 0, radius);
 
     if(this->getIndex() == kaynak)
-        getDisplayString().setTagArg("t", 0, "KAYNAK");
+        getDisplayString().setTagArg("t", 0, "SOURCE");
     if(this->getIndex() == hedef)
-        getDisplayString().setTagArg("t", 0, "HEDEF");
+        getDisplayString().setTagArg("t", 0, "DEST.");
 
 
-    // get malicious and set them in simulation
+    // get malicious nodes and set them in simulation
     if (attackMode == 1) {
         string zararlilar = flatTopologyModule->par("zararlilar");
         bool isMalicious = Util::getMaliciousNodes(zararlilar, this->getIndex(), zararliRss, rss);
         if(isMalicious) {
-            getDisplayString().setTagArg("t", 0, "ZARARLI");
+            getDisplayString().setTagArg("t", 0, "MALCS.");
             getDisplayString().setTagArg("i", 1, "YELLOW");
         }
     }
@@ -208,7 +204,7 @@ void Node::handleHello(cMessage *msg){
         EV <<  "Uzaklık : " << uzaklik << endl;
         EV <<  "Gönderen Index: " << gonderenIndex << endl;
 
-        if(uzaklik < kapsama && gonderenIndex != this->getIndex()){
+        if(uzaklik < radius && gonderenIndex != this->getIndex()){
 
             komsu.push_back(gonderenIndex);
 
