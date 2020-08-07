@@ -18,12 +18,14 @@ void Node::initialize(){
     nodeSayisi = flatTopologyModule->par("nodeSayisi");
     kaynak = flatTopologyModule->par("kaynak");
     hedef  = flatTopologyModule->par("hedef");
-    radius= flatTopologyModule->par("radius");
+    radius = flatTopologyModule->par("radius");
     rss = flatTopologyModule->par("rss");
     zararliRss = flatTopologyModule->par("zararliRss");
     thresholdRss = flatTopologyModule->par("thresholdRss");
     delayTime = flatTopologyModule->par("delayTime");
     attackMode = flatTopologyModule->par("attackMode");
+    nodeId = this->getId();
+    nodeIndex  = this->getIndex();
 
     stringstream topolojiBoyutuX;
     topolojiBoyutuX << flatTopologyModule->getDisplayString().getTagArg("bgb",0);
@@ -40,17 +42,18 @@ void Node::initialize(){
     getDisplayString().setTagArg("p", 1, nodeKordinatY);
     getDisplayString().setTagArg("r", 0, radius);
 
-    if(this->getIndex() == kaynak)
+    EV << "KONUM : " << nodeKordinatX << " - " << nodeKordinatY << endl;
+
+    if(nodeIndex == kaynak)
         getDisplayString().setTagArg("t", 0, "SOURCE");
-    if(this->getIndex() == hedef)
+    if(nodeIndex == hedef)
         getDisplayString().setTagArg("t", 0, "DEST.");
 
 
     // get malicious nodes and set them in simulation
     if (attackMode == 1) {
         string zararlilar = flatTopologyModule->par("zararlilar");
-        bool isMalicious = Util::getMaliciousNodes(zararlilar, this->getIndex(), zararliRss, rss);
-        if(isMalicious) {
+        if(Util::isMaliciousNode(zararlilar, nodeIndex, zararliRss, rss)) {
             getDisplayString().setTagArg("t", 0, "MALCS.");
             getDisplayString().setTagArg("i", 1, "YELLOW");
         }
@@ -82,9 +85,9 @@ void Node::handleMessage(cMessage *msg){
            hello->addPar("HELLO_Y");
            hello->par("HELLO_Y") = msg->par("POSY").doubleValue();
            hello->addPar("HELLO_INDEX");
-           hello->par("HELLO_INDEX") = this->getIndex();
+           hello->par("HELLO_INDEX") = nodeIndex;
            hello->addPar("HELLO_NODE_ID");
-           hello->par("HELLO_NODE_ID") = this->getId();
+           hello->par("HELLO_NODE_ID") = nodeId;
            hello->addPar("RSS");
            hello->par("RSS") = rss;
            hello->addPar("SENDING_TIME");
@@ -104,12 +107,12 @@ void Node::handleMessage(cMessage *msg){
 
         /* ########## HELLO MESAJLARI İLE KOMŞU BUL ########## */
 
-        if (strcmp(msg->getName(), "HELLO") == 0 && this->getIndex() != msg->par("HELLO_INDEX").doubleValue()){
+        if (strcmp(msg->getName(), "HELLO") == 0 && nodeIndex != msg->par("HELLO_INDEX").doubleValue()){
             handleHello(msg);
         }
 
         if(strcmp(msg->getName(), "TEST_MSG") == 0){
-            EV << ":::: SUPHELI MESAJI ALDI :::: " << this->getId() << endl;
+            EV << ":::: SUPHELI MESAJI ALDI :::: " << nodeId << endl;
             cMessage *testMsgResp = new cMessage("TEST_MSG_RESP");
             testMsgResp->addPar("TEST_MSG_ID");
             int msgSenderId =  testMsgResp->par("TEST_MSG_ID");
@@ -140,7 +143,7 @@ void Node::handleMessage(cMessage *msg){
             EV << "GONDEREN ID   : "<< msg->par("NODE_ID").doubleValue() << endl;
             EV << "GONDEREN INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
 
-            if(this->getIndex() != hedef)
+            if(nodeIndex != hedef)
                 this->sendData();
             else
                 EV << "VERİ BAŞARIYLA ALINDI." << endl;
@@ -185,26 +188,27 @@ void Node::handleHello(cMessage *msg){
 
         EV << "GONDEREN INDEX " << gonderenIndex << endl;
         EV << "MSG - GONDEREN ID " << gonderenId << endl;
-        EV << "BEN - GET ID " << this->getId() << endl;
+        EV << "BEN - GET ID " << nodeId << endl;
 
     // sadece rssden buyukse süpheli
     } else if(gelenRss > rss) {
-        EV << ":::: SUPHELI :::: " << this->getId() << endl;
+        EV << ":::: SUPHELI :::: " << nodeId << endl;
         cMessage *testMsg = new cMessage("TEST_MSG");
         testMsg->addPar("TEST_MSG_ID");
-        testMsg->par("TEST_MSG_ID") = this->getId();
+        testMsg->par("TEST_MSG_ID") = nodeId;
         cModule *node = flatTopologyModule->getSubmodule("nodes", gonderenId);
         sendDirect(testMsg, node, "inputGate");
 
     // sıkıntı yok devam et
     } else {
 
-        int uzaklik = Util::kapsamaAlaniHesapla(gelenX,gelenY);
+        double uzaklik = Util::calculateDistance(nodeKordinatX, nodeKordinatY, gelenX, gelenY);
 
-        EV <<  "Uzaklık : " << uzaklik << endl;
-        EV <<  "Gönderen Index: " << gonderenIndex << endl;
+        EV << "Uzaklık : " << uzaklik << endl;
+        EV << "NODE::ID " << nodeId << " -- NODE::INDEX " << nodeIndex << " -- X::Y " << nodeKordinatX << "-" << nodeKordinatY << endl;
+        EV << "S::NODE::ID " << gonderenIndex << " -- S::NODE::INDEX " << gonderenIndex << " -- X::Y " << gelenX << "-" << gelenY << endl;
 
-        if(uzaklik < radius && gonderenIndex != this->getIndex()){
+        if(uzaklik < radius && gonderenIndex != nodeIndex){
 
             komsu.push_back(gonderenIndex);
 
@@ -214,7 +218,7 @@ void Node::handleHello(cMessage *msg){
             }
         }
 
-        if(this->getIndex() == kaynak){
+        if(nodeIndex == kaynak){
 
             helloMesajiSayisi++;
 
@@ -242,7 +246,7 @@ void Node::RREQ(){
     rreq->setHopCount(guncelHopSayisi);
     rreq->setHedefSeqNo(1);
     rreq->addPar("NODE_INDEX");
-    rreq->par("NODE_INDEX") = this->getIndex();
+    rreq->par("NODE_INDEX") = nodeIndex;
 
     cModule *node;
 
@@ -268,7 +272,7 @@ void Node::handleRREQ(AODVRREQ *rreq){
 
         guncelHopSayisi = rreq->getHopCount() + 1;
 
-        if(this->getIndex() == hedef){
+        if(nodeIndex == hedef){
 
 
             if(hedefHerKomsudanBirRREPalsin < komsu.size()){
@@ -326,7 +330,7 @@ void Node::handleRREQ(AODVRREQ *rreq){
 
         }else{
 
-           if(rreqId != rreq->getRreqId() && this->getIndex() != kaynak){
+           if(rreqId != rreq->getRreqId() && nodeIndex != kaynak){
 
                 geriRotalama["kaynak"]      = rreq->getKaynakAdr();
                 geriRotalama["hedef"]       = rreq->getHedefAdr();
@@ -368,7 +372,7 @@ void Node::RREP(){
     rrep->setHopCount(guncelHopSayisi);
     rrep->setHedefSeqNo(2); // Sadece ilk RREP tarafından arttırılabilir.
     rrep->addPar("NODE_INDEX");
-    rrep->par("NODE_INDEX") = this->getIndex();
+    rrep->par("NODE_INDEX") = nodeIndex;
 
     cModule *node = flatTopologyModule->getSubmodule("nodes", geriRotalama["sonraki"]);
     sendDirect(rrep, node, "inputGate");
@@ -381,7 +385,7 @@ void Node::handleRREP(AODVRREP *rrep){
 
     if(rrep != nullptr){
 
-        if (this->getIndex() != kaynak) {
+        if (nodeIndex != kaynak) {
 
             EV << "RREP ALINDI.. " << "İLERİ ROTALAMA TABLOSU" << endl << "-------------------------------------" << endl;
             ileriRotalama["kaynak"]      = rrep->getHedefAdr();
@@ -408,9 +412,9 @@ void Node::handleRREP(AODVRREP *rrep){
 void Node::sendData(){
     cMessage *veri = new cMessage("DATA");
     veri->addPar("NODE_INDEX");
-    veri->par("NODE_INDEX") = this->getIndex();
+    veri->par("NODE_INDEX") = nodeIndex;
     veri->addPar("NODE_ID");
-    veri->par("NODE_ID") = this->getId();
+    veri->par("NODE_ID") = nodeId;
 
     cModule *node = flatTopologyModule->getSubmodule("nodes", ileriRotalama["sonraki"]);
     sendDirect(veri, node, "inputGate");

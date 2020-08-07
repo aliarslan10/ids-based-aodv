@@ -21,6 +21,8 @@ const int RANDOM_NUMBER_GENERATOR = 2; // omnet.ini seed number
 
 class Node : public cSimpleModule{
     private:
+        int nodeId;
+        int nodeIndex;
         int kaynak;
         int hedef;
         int nodeSayisi;

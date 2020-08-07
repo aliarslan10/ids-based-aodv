@@ -7,13 +7,13 @@
 
 #include "Util.h"
 
-double Util::kapsamaAlaniHesapla(int gondericiKordinatX, int gondericiKordinatY){
-    double x = double(pow(abs(gondericiKordinatX - gondericiKordinatY), 2));
-    double y = double(pow(abs(gondericiKordinatY - gondericiKordinatX), 2));
+ double Util::calculateDistance(int receiverX, int receiverY, int senderX, int senderY) {
+    double x = double(pow(abs(receiverX - senderX), 2));
+    double y = double(pow(abs(receiverY - senderY), 2));
     return sqrt(x + y);
 }
 
-bool Util::getMaliciousNodes(string maliciousFromConf, int nodeIndex, int maliciousRss, int rss) {
+bool Util::isMaliciousNode(string maliciousFromConf, int nodeIndex, int maliciousRss, int rss) {
     vector<int> maliciousNodes;
     stringstream maliciousNodesFromConfig(maliciousFromConf);
     bool nodeMaliciousStatus = false;
