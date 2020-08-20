@@ -19,7 +19,7 @@ cModule *flatTopologyModule;
 
 const int RANDOM_NUMBER_GENERATOR = 2; // omnet.ini seed number
 
-class Node : public cSimpleModule{
+class Node : public cSimpleModule {
     private:
         int nodeId;
         int nodeIndex;
@@ -33,12 +33,13 @@ class Node : public cSimpleModule{
         int nodeKordinatY;
         int helloMesajiSayisi = 0;
         int guncelHopSayisi=0, enKucukHop=0, enBuyukHedefSiraNo=0;
-        int rss, zararliRss, thresholdRss;
+        int minRss, avgRss, maxRss, rss, zararliRss;
         double delayTime;
         int attackMode;
         int zararliPaketBoyutu;
         int ddosGonderimSayisi;
         int saldiriSayisi = 0;
+        const char* zararlilar;
 
         vector<int> komsu;
         map<string, int> geriRotalama;
@@ -55,8 +56,10 @@ class Node : public cSimpleModule{
         virtual void handleRREP(AODVRREP *rrep);
         void RREQ();
         void RREP();
-        void sendData();
+        void sendData(const char* msg);
+        void send(cMessage *msg, int receiver);
         void start();
+        bool isHelloAttack(int receivedRss, int senderIndex, double sendingTime);
 };
 
 #endif /* NODE_H_ */

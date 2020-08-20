@@ -13,9 +13,9 @@
     return sqrt(x + y);
 }
 
-bool Util::isMaliciousNode(string maliciousFromConf, int nodeIndex, int maliciousRss, int rss) {
+bool Util::isMaliciousNode(string malicious, int nodeIndex) {
     vector<int> maliciousNodes;
-    stringstream maliciousNodesFromConfig(maliciousFromConf);
+    stringstream maliciousNodesFromConfig(malicious);
     bool nodeMaliciousStatus = false;
 
     for (int i; maliciousNodesFromConfig >> i;) {
@@ -27,9 +27,14 @@ bool Util::isMaliciousNode(string maliciousFromConf, int nodeIndex, int maliciou
     for (int malicious : maliciousNodes) {
         if(malicious == nodeIndex){
             nodeMaliciousStatus = true;
-            rss = rss + (std::rand() % (maliciousRss - rss + 1));
         }
     }
 
     return nodeMaliciousStatus;
+}
+
+int Util::randomNumberGenerator(int min, int max, int seed) {
+    if(seed)
+    srand(seed);
+    return min + (rand() % (max - min + 1));
 }

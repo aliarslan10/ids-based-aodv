@@ -19,11 +19,13 @@ void Node::initialize(){
     kaynak = flatTopologyModule->par("kaynak");
     hedef  = flatTopologyModule->par("hedef");
     radius = flatTopologyModule->par("radius");
-    rss = flatTopologyModule->par("rss");
+    minRss = flatTopologyModule->par("minRss");
+    avgRss = flatTopologyModule->par("avgRss");
+    maxRss = flatTopologyModule->par("maxRss");
     zararliRss = flatTopologyModule->par("zararliRss");
-    thresholdRss = flatTopologyModule->par("thresholdRss");
     delayTime = flatTopologyModule->par("delayTime");
     attackMode = flatTopologyModule->par("attackMode");
+    zararlilar = flatTopologyModule->par("zararlilar");
     nodeId = this->getId();
     nodeIndex  = this->getIndex();
 
@@ -49,13 +51,14 @@ void Node::initialize(){
     if(nodeIndex == hedef)
         getDisplayString().setTagArg("t", 0, "DEST.");
 
-
+    rss = Util::randomNumberGenerator(minRss, maxRss);
+    EV << "RSS : " << rss << endl;
     // get malicious nodes and set them in simulation
     if (attackMode == 1) {
-        string zararlilar = flatTopologyModule->par("zararlilar");
-        if(Util::isMaliciousNode(zararlilar, nodeIndex, zararliRss, rss)) {
+        if(Util::isMaliciousNode(zararlilar, nodeIndex)) {
             getDisplayString().setTagArg("t", 0, "MALCS.");
             getDisplayString().setTagArg("i", 1, "YELLOW");
+            rss = zararliRss;
         }
     }
 
@@ -101,7 +104,6 @@ void Node::handleMessage(cMessage *msg){
                 sendDirect(hello, node, "inputGate");
                 hello = hello->dup();
             }
-
         }
 
 
@@ -112,25 +114,27 @@ void Node::handleMessage(cMessage *msg){
         }
 
         if(strcmp(msg->getName(), "TEST_MSG") == 0){
-            EV << ":::: SUPHELI MESAJI ALDI :::: " << nodeId << endl;
             cMessage *testMsgResp = new cMessage("TEST_MSG_RESP");
-            testMsgResp->addPar("TEST_MSG_ID");
-            int msgSenderId =  testMsgResp->par("TEST_MSG_ID");
+            testMsgResp->addPar("TEST_MSG_INDEX");
+            int msgSenderIndex =  msg->par("TEST_MSG_INDEX");
 
-            cModule *node = flatTopologyModule->getSubmodule("nodes", msgSenderId);
+            EV << ":::: BU NODE SUPHELI VE BUNDAN MSJ ALDI >> " << msgSenderIndex << endl;
 
-            EV << "delay" << delayTime << endl;
-            EV << "sim tim - 1"  << simTime().dbl() << endl;
-            usleep(delayTime);
-            EV << "SENDING TIME - 2" << simTime().dbl() << endl;
-            EV << "SENDER" << msgSenderId << endl;
+            EV << "SIMTIME - 1 : " << simTime() << endl;
+            EV << "CPPTIME - 1 : " << time(0) << endl;
+            float randomDelay = Util::randomNumberGenerator(0, 10, time(0)); //  * 0.1
+            EV << "delay" << randomDelay << endl;
+            sleep(randomDelay);
+            EV << "SIMTIME - 2 : " << simTime() << endl;
+            EV << "CPPTIME - 2 : " << time(0) << endl;
 
-            sendDirect(testMsgResp, node, "inputGate");
+            //cModule *node = flatTopologyModule->getSubmodule("nodes", msgSenderIndex);
+            //sendDirect(testMsgResp, node, "inputGate");
+            this->send(testMsgResp, msgSenderIndex);
         }
 
-
         if(strcmp(msg->getName(), "TEST_MSG_RESP") == 0){
-            EV << "TEST_MSG_RESP -- SUPHELI MSG ATTI --" << endl << endl;
+            EV << "--- TEST_MSG_RESP GELDI ---" << endl << endl;
             EV << "CURRENT TIME" << simTime().dbl() << endl;
         }
 
@@ -144,7 +148,7 @@ void Node::handleMessage(cMessage *msg){
             EV << "GONDEREN INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
 
             if(nodeIndex != hedef)
-                this->sendData();
+                this->sendData("DATA");
             else
                 EV << "VERİ BAŞARIYLA ALINDI." << endl;
         }
@@ -171,69 +175,75 @@ void Node::handleMessage(cMessage *msg){
 
 void Node::handleHello(cMessage *msg){
 
-    int gonderenIndex = msg->par("HELLO_INDEX");
-    int gonderenId = msg->par("HELLO_NODE_ID");
+    int senderIndex = msg->par("HELLO_INDEX");
+    int senderId = msg->par("HELLO_NODE_ID");
     int gelenX = msg->par("HELLO_X");
     int gelenY = msg->par("HELLO_Y");
-    int gelenRss = msg->par("RSS");
+    int receivedRss = msg->par("RSS");
     double sendingTime = msg->par("SENDING_TIME");
 
-    EV <<  "HANDLE HELLO - GELEN RSS: " << gelenRss << endl;
+    EV <<  "HANDLE HELLO - GELEN RSS: " << receivedRss << endl;
 
-    // esikten buyukse kesin zararli
-    if(gelenRss > thresholdRss) {
-        EV << "Indexli Düğüm Zararlı" << gonderenIndex << endl;
-        EV << "SENDING TIME" << sendingTime << endl;
-        EV << "CURRENT TIME" << simTime().dbl() << endl;
+    double uzaklik = Util::calculateDistance(nodeKordinatX, nodeKordinatY, gelenX, gelenY);
 
-        EV << "GONDEREN INDEX " << gonderenIndex << endl;
-        EV << "MSG - GONDEREN ID " << gonderenId << endl;
-        EV << "BEN - GET ID " << nodeId << endl;
+    EV << "Uzaklık : " << uzaklik << endl;
+    EV << " -- NODE::INDEX " << nodeIndex << " -- X::Y " << nodeKordinatX << "-" << nodeKordinatY << endl;
+    EV << " -- SENDER::NODE::INDEX " << senderIndex << " -- X::Y " << gelenX << "-" << gelenY << endl;
 
-    // sadece rssden buyukse süpheli
-    } else if(gelenRss > rss) {
-        EV << ":::: SUPHELI :::: " << nodeId << endl;
-        cMessage *testMsg = new cMessage("TEST_MSG");
-        testMsg->addPar("TEST_MSG_ID");
-        testMsg->par("TEST_MSG_ID") = nodeId;
-        cModule *node = flatTopologyModule->getSubmodule("nodes", gonderenId);
-        sendDirect(testMsg, node, "inputGate");
+    if(uzaklik < radius && senderIndex != nodeIndex){
 
-    // sıkıntı yok devam et
-    } else {
-
-        double uzaklik = Util::calculateDistance(nodeKordinatX, nodeKordinatY, gelenX, gelenY);
-
-        EV << "Uzaklık : " << uzaklik << endl;
-        EV << "NODE::ID " << nodeId << " -- NODE::INDEX " << nodeIndex << " -- X::Y " << nodeKordinatX << "-" << nodeKordinatY << endl;
-        EV << "S::NODE::ID " << gonderenIndex << " -- S::NODE::INDEX " << gonderenIndex << " -- X::Y " << gelenX << "-" << gelenY << endl;
-
-        if(uzaklik < radius && gonderenIndex != nodeIndex){
-
-            komsu.push_back(gonderenIndex);
-
-            for(int i=1; i<komsu.size(); i++){
-
-                EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
-            }
+        if(!Util::isMaliciousNode(zararlilar, nodeIndex) && !isHelloAttack(receivedRss, senderIndex, sendingTime)) {
+            komsu.push_back(senderIndex);
         }
 
-        if(nodeIndex == kaynak){
+        for(int i=1; i<komsu.size(); i++){
+            EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
+        }
+    }
 
-            helloMesajiSayisi++;
+    if(nodeIndex == kaynak) {
 
-            if(helloMesajiSayisi == nodeSayisi-1){ // tüm komşulardan alana kadar, kendisi hariç
+        helloMesajiSayisi++;
 
-                EV << "ROTA KEŞFİ BAŞLATILIYOR..." << endl << endl;
-                rreqId  = uniform(0,999); // ilk atama burada yapılıyor
-                scheduleStart(simTime()+uniform(500,1000));
-                RREQ();
-            }
+        /**
+         * tüm komşulardan alana kadar, kendisi hariç
+         * herkesten hello mesajı aldıysa artık komsuları bellidir.
+         */
+        if(helloMesajiSayisi == nodeSayisi-1) {
 
+            EV << "ROTA KEŞFİ BAŞLATILIYOR..." << endl << endl;
+            rreqId  = uniform(0,999); // first assign
+            scheduleStart(simTime()+uniform(500,1000));
+            RREQ();
         }
     }
 }
 
+bool Node::isHelloAttack(int receivedRss, int senderIndex, double sendingTime) {
+    // malcs.
+    if(receivedRss > maxRss) {
+        EV << "Indexli Düğüm Zararlı" << senderIndex << endl;
+        return true;
+
+      // suspicious
+    } else if(receivedRss > avgRss) {
+
+        EV << ":::: SUPHELI INDEX :::: " << senderIndex << endl;
+        EV << ":::: BENIM INDEX --- SUPHELIYE MSG GONDERIYORUM :::: " << nodeIndex << endl;
+        EV << "SENDING TIME" << sendingTime << endl;
+        EV << "CURRENT TIME" << simTime().dbl() << endl;
+
+        cMessage *testMsg = new cMessage("TEST_MSG");
+        testMsg->addPar("TEST_MSG_INDEX");
+        testMsg->par("TEST_MSG_INDEX") = nodeIndex;
+
+        cModule *node = flatTopologyModule->getSubmodule("nodes", senderIndex);
+        sendDirect(testMsg, node, "inputGate");
+        ///// return KODLANACAK.
+    }
+
+    return false;
+}
 
 void Node::RREQ(){
 
@@ -374,8 +384,9 @@ void Node::RREP(){
     rrep->addPar("NODE_INDEX");
     rrep->par("NODE_INDEX") = nodeIndex;
 
-    cModule *node = flatTopologyModule->getSubmodule("nodes", geriRotalama["sonraki"]);
-    sendDirect(rrep, node, "inputGate");
+    //cModule *node = flatTopologyModule->getSubmodule("nodes", geriRotalama["sonraki"]);
+    //sendDirect(rrep, node, "inputGate");
+    this->send(rrep, geriRotalama["sonraki"]);
 
 }
 
@@ -404,23 +415,31 @@ void Node::handleRREP(AODVRREP *rrep){
             ileriRotalama["sonraki"]     = rrep->par("NODE_INDEX");
 
             EV << "ROTA KEŞFİ TAMAMLANDI. KAYNAK VERİYİ GÖNDERİLİYOR..." << endl;
-            this->sendData();
+            this->sendData("DATA");
         }
     }
 }
 
-void Node::sendData(){
-    cMessage *veri = new cMessage("DATA");
-    veri->addPar("NODE_INDEX");
-    veri->par("NODE_INDEX") = nodeIndex;
-    veri->addPar("NODE_ID");
-    veri->par("NODE_ID") = nodeId;
+/*
+ * It sends message from source to destination through route
+ */
+void Node::sendData(const char* msg){
 
-    cModule *node = flatTopologyModule->getSubmodule("nodes", ileriRotalama["sonraki"]);
-    sendDirect(veri, node, "inputGate");
+    cMessage *message = new cMessage(msg);
+    message->addPar("NODE_INDEX");
+    message->par("NODE_INDEX") = nodeIndex;
+    message->addPar("NODE_ID");
+    message->par("NODE_ID") = nodeId;
+
+//    cModule *node = flatTopologyModule->getSubmodule("nodes", ileriRotalama["sonraki"]);
+//    sendDirect(message, node, "inputGate");
+    this->send(message, ileriRotalama["sonraki"]);
 }
 
-
+void Node::send(cMessage *msg, int receiver) {
+    cModule *node = flatTopologyModule->getSubmodule("nodes", receiver);
+    sendDirect(msg, node, "inputGate");
+}
 
 
 
