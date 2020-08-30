@@ -18,7 +18,7 @@ information in routing table
 12. Node S is classified as Malicious and rejects the request.
 13. End
 
-### What Does The Code Work?
+### How Does The Code Work?
 1. Hello Message propagates.
 2. Receiver node checks destinaton and RSS of the betwen itself and sender node. If there is no any risk, it sets the sender as a neighbor node. Optimum distance and radius can be set from omnet.ini file.
 
