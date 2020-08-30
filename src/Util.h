@@ -22,6 +22,5 @@ class Util {
     public:
         static double calculateDistance(int receiverX, int receiverY, int senderX, int senderY);
         static bool isMaliciousNode(string m, int nodeIndex);
-        static int randomNumberGenerator(int min, int max, int seed = 0);
 };
 #endif /* SRC_UTIL_H_ */

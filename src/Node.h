@@ -11,6 +11,7 @@
 #include <string.h>
 #include <omnetpp.h>
 #include <unistd.h>
+#include <algorithm>
 
 using namespace omnetpp;
 using namespace std;
@@ -58,8 +59,10 @@ class Node : public cSimpleModule {
         void RREP();
         void sendData(const char* msg);
         void send(cMessage *msg, int receiver);
+        void sendDelay(cMessage *msg, float delayTime, int receiver);
         void start();
         bool isHelloAttack(int receivedRss, int senderIndex, double sendingTime);
+        void setAsNeighbor(int senderNodeIndex);
 };
 
 #endif /* NODE_H_ */

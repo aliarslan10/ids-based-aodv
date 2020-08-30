@@ -51,8 +51,8 @@ void Node::initialize(){
     if(nodeIndex == hedef)
         getDisplayString().setTagArg("t", 0, "DEST.");
 
-    rss = Util::randomNumberGenerator(minRss, maxRss);
-    EV << "RSS : " << rss << endl;
+    rss = intuniform(minRss, maxRss);
+
     // get malicious nodes and set them in simulation
     if (attackMode == 1) {
         if(Util::isMaliciousNode(zararlilar, nodeIndex)) {
@@ -95,7 +95,7 @@ void Node::handleMessage(cMessage *msg){
            hello->par("RSS") = rss;
            hello->addPar("SENDING_TIME");
            hello->par("SENDING_TIME") = simTime().dbl();
-
+           EV << "Gönderdiğim RSS " << rss << endl;
            cModule *node;
 
            for (int i = 0; i < nodeSayisi; i++) // sistemdeki dugumlere yollanacak.
@@ -113,32 +113,6 @@ void Node::handleMessage(cMessage *msg){
             handleHello(msg);
         }
 
-        if(strcmp(msg->getName(), "TEST_MSG") == 0){
-            cMessage *testMsgResp = new cMessage("TEST_MSG_RESP");
-            testMsgResp->addPar("TEST_MSG_INDEX");
-            int msgSenderIndex =  msg->par("TEST_MSG_INDEX");
-
-            EV << ":::: BU NODE SUPHELI VE BUNDAN MSJ ALDI >> " << msgSenderIndex << endl;
-
-            EV << "SIMTIME - 1 : " << simTime() << endl;
-            EV << "CPPTIME - 1 : " << time(0) << endl;
-            float randomDelay = Util::randomNumberGenerator(0, 10, time(0)); //  * 0.1
-            EV << "delay" << randomDelay << endl;
-            sleep(randomDelay);
-            EV << "SIMTIME - 2 : " << simTime() << endl;
-            EV << "CPPTIME - 2 : " << time(0) << endl;
-
-            //cModule *node = flatTopologyModule->getSubmodule("nodes", msgSenderIndex);
-            //sendDirect(testMsgResp, node, "inputGate");
-            this->send(testMsgResp, msgSenderIndex);
-        }
-
-        if(strcmp(msg->getName(), "TEST_MSG_RESP") == 0){
-            EV << "--- TEST_MSG_RESP GELDI ---" << endl << endl;
-            EV << "CURRENT TIME" << simTime().dbl() << endl;
-        }
-
-
         /* ########## VERİ GÖNDER ########## */
 
         if(strcmp(msg->getName(), "DATA") == 0){
@@ -152,6 +126,29 @@ void Node::handleMessage(cMessage *msg){
             else
                 EV << "VERİ BAŞARIYLA ALINDI." << endl;
         }
+
+
+
+        /* ########## CHECK SUSPICIOUS NODE ########## */
+        if(strcmp(msg->getName(), "TEST_MSG") == 0){
+            cMessage *testMsgResp = new cMessage("TEST_MSG_RESP");
+            int msgSenderIndex =  msg->par("TEST_MSG_SENDER_INDEX");
+            testMsgResp->addPar("DELAY");
+            testMsgResp->par("DELAY") = uniform(0, 1);
+            testMsgResp->addPar("TEST_RESP_MSG_SENDER_INDEX");
+            testMsgResp->par("TEST_RESP_MSG_SENDER_INDEX") = nodeIndex;
+            this->send(testMsgResp, msgSenderIndex);
+        }
+
+        if(strcmp(msg->getName(), "TEST_MSG_RESP") == 0){
+            double delay =  msg->par("DELAY").doubleValue();
+            double sender = msg->par("TEST_RESP_MSG_SENDER_INDEX");
+            EV << "DELAY : " << delay << " //// SENDER : " << sender << endl;
+            if (delay < delayTime) {
+                this->setAsNeighbor(sender);
+            }
+        }
+        /* ########## END - CHECK SUSPICIOUS NODE ########## */
 
 
         /* ########## PAKETLERİ YAKALA ########## */
@@ -191,13 +188,8 @@ void Node::handleHello(cMessage *msg){
     EV << " -- SENDER::NODE::INDEX " << senderIndex << " -- X::Y " << gelenX << "-" << gelenY << endl;
 
     if(uzaklik < radius && senderIndex != nodeIndex){
-
-        if(!Util::isMaliciousNode(zararlilar, nodeIndex) && !isHelloAttack(receivedRss, senderIndex, sendingTime)) {
-            komsu.push_back(senderIndex);
-        }
-
-        for(int i=1; i<komsu.size(); i++){
-            EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
+        if(!isHelloAttack(receivedRss, senderIndex, sendingTime)) {
+            this->setAsNeighbor(senderIndex);
         }
     }
 
@@ -219,6 +211,25 @@ void Node::handleHello(cMessage *msg){
     }
 }
 
+void Node::setAsNeighbor(int senderIndex){
+    bool isThere = false;
+    for(int i=1; i<komsu.size(); i++){
+        if(komsu[i] == senderIndex){
+            isThere = true;
+        }
+    }
+
+    if(!isThere){
+        komsu.push_back(senderIndex);
+    }
+
+    EV << "--------- NEIGH. LIST --------" << endl;
+    for(int i=1; i<komsu.size(); i++){
+        EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
+    }
+    EV << "--------- END --------" << endl;
+}
+
 bool Node::isHelloAttack(int receivedRss, int senderIndex, double sendingTime) {
     // malcs.
     if(receivedRss > maxRss) {
@@ -234,12 +245,10 @@ bool Node::isHelloAttack(int receivedRss, int senderIndex, double sendingTime) {
         EV << "CURRENT TIME" << simTime().dbl() << endl;
 
         cMessage *testMsg = new cMessage("TEST_MSG");
-        testMsg->addPar("TEST_MSG_INDEX");
-        testMsg->par("TEST_MSG_INDEX") = nodeIndex;
+        testMsg->addPar("TEST_MSG_SENDER_INDEX");
+        testMsg->par("TEST_MSG_SENDER_INDEX") = nodeIndex;
 
-        cModule *node = flatTopologyModule->getSubmodule("nodes", senderIndex);
-        sendDirect(testMsg, node, "inputGate");
-        ///// return KODLANACAK.
+        this->send(testMsg, senderIndex);
     }
 
     return false;
@@ -384,15 +393,10 @@ void Node::RREP(){
     rrep->addPar("NODE_INDEX");
     rrep->par("NODE_INDEX") = nodeIndex;
 
-    //cModule *node = flatTopologyModule->getSubmodule("nodes", geriRotalama["sonraki"]);
-    //sendDirect(rrep, node, "inputGate");
     this->send(rrep, geriRotalama["sonraki"]);
-
 }
 
 void Node::handleRREP(AODVRREP *rrep){
-
-    // AODVRREP *rrep = dynamic_cast<AODVRREP*>(msg);
 
     if(rrep != nullptr){
 
@@ -430,9 +434,6 @@ void Node::sendData(const char* msg){
     message->par("NODE_INDEX") = nodeIndex;
     message->addPar("NODE_ID");
     message->par("NODE_ID") = nodeId;
-
-//    cModule *node = flatTopologyModule->getSubmodule("nodes", ileriRotalama["sonraki"]);
-//    sendDirect(message, node, "inputGate");
     this->send(message, ileriRotalama["sonraki"]);
 }
 
@@ -440,6 +441,3 @@ void Node::send(cMessage *msg, int receiver) {
     cModule *node = flatTopologyModule->getSubmodule("nodes", receiver);
     sendDirect(msg, node, "inputGate");
 }
-
-
-

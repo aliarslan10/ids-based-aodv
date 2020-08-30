@@ -1,5 +1,6 @@
-# IDS Based AODV
+## IDS Based AODV
 
+### What is The Scenario?
 1: If A node receives hello request from a node S then
 2: if Signal strength of S= fixed signal strength in radio
 range
@@ -16,3 +17,13 @@ information in routing table
 range
 11: Node S is classified as Malicious and rejects the request.
 End
+
+### What Does The Code Work?
+1. Hello Message propagates.
+2. Receiver node checks destinaton and RSS of the betwen itself and sender node. If there is no any risk, it sets the sender as a neighbor node. Optimum distance and radius can be set from omnet.ini file.
+
+    ![](https://i.imgur.com/s4Khprl.png)
+
+3. In isHelloAttack(), it checks the RSS. If radius less than average RSS there is no problem but, if RSS greater than average, it is considered as a suspicious node. If RSS would be bigger than MAX_RSS, we consider it directly malicious.
+4. For suspicious nodes, TEST_MSG is sent. If response is greater than average response it consier as malicious but if is not, so it can be added neighbor by node which sends TEST_MSG.
+5. After these process, all nodes have non-malicious neighbor and AODV works as is.

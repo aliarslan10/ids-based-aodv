@@ -32,9 +32,3 @@ bool Util::isMaliciousNode(string malicious, int nodeIndex) {
 
     return nodeMaliciousStatus;
 }
-
-int Util::randomNumberGenerator(int min, int max, int seed) {
-    if(seed)
-    srand(seed);
-    return min + (rand() % (max - min + 1));
-}
