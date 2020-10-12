@@ -107,13 +107,10 @@ void Node::handleMessage(cMessage *msg){
         }
 
 
-        /* ########## HELLO MESAJLARI İLE KOMŞU BUL ########## */
-
         if (strcmp(msg->getName(), "HELLO") == 0 && nodeIndex != msg->par("HELLO_INDEX").doubleValue()){
             handleHello(msg);
         }
 
-        /* ########## VERİ GÖNDER ########## */
 
         if(strcmp(msg->getName(), "DATA") == 0){
 
@@ -126,8 +123,6 @@ void Node::handleMessage(cMessage *msg){
             else
                 EV << "VERİ BAŞARIYLA ALINDI." << endl;
         }
-
-
 
         /* ########## CHECK SUSPICIOUS NODE ########## */
         if(strcmp(msg->getName(), "TEST_MSG") == 0){
@@ -150,22 +145,11 @@ void Node::handleMessage(cMessage *msg){
         }
         /* ########## END - CHECK SUSPICIOUS NODE ########## */
 
-
-        /* ########## PAKETLERİ YAKALA ########## */
-
          if(AODVMesajPaketiTipi::RREQ)
              handleRREQ(dynamic_cast<AODVRREQ*>(msg)); // alternatif : check_and_cast<AODVRREQ*>(msg)
 
          if(AODVMesajPaketiTipi::RREP)
              handleRREP(dynamic_cast<AODVRREP*>(msg));
-
-       //  if(AODVMesajPaketiTipi::RERR)
-             //handleRERR(dynamic_cast<AODVRERR*>(msg));
-
-        // if(AODVMesajPaketiTipi::RREP_ACK)
-             //handleRREP(dynamic_cast<AODVRREP*>(msg));
-
-         //throw cRuntimeError("tanımsız paket");
     }
 
 }
