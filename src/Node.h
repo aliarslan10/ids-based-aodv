@@ -1,8 +1,8 @@
 /*
  * dugum.h
  *
- *  Created on: Jun 27, 2020
- *      Author: aliarslan
+ *  Created on: Oct 12, 2020
+ *  Author: aliarslan
  */
 
 #ifndef NODE_H_
@@ -61,7 +61,6 @@ class Node : public cSimpleModule {
         void send(cMessage *msg, int receiver);
         void sendDelay(cMessage *msg, float delayTime, int receiver);
         void start();
-        bool isHelloAttack(int receivedRss, int senderIndex, double sendingTime);
         void setAsNeighbor(int senderNodeIndex);
 };
 

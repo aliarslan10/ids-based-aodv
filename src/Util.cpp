@@ -1,8 +1,8 @@
 /*
  * Util.cpp
  *
- *  Created on: 30 Tem 2020
- *      Author: Ali Arslan
+ * Created on: Oct 12, 2020
+ * Author: Ali Arslan
  */
 
 #include "Util.h"
@@ -31,4 +31,9 @@ bool Util::isMaliciousNode(string malicious, int nodeIndex) {
     }
 
     return nodeMaliciousStatus;
+}
+
+bool Util::isHelloAttack(int receivedRss, int senderIndex, double sendingTime) {
+
+    return false;
 }

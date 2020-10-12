@@ -1,7 +1,7 @@
 /*
  * node.cpp
  *
- *  Created on: Jun 27, 2020
+ *  Created on: Oct 12, 2020
  *  Author: aliarslan
  */
 
@@ -124,27 +124,6 @@ void Node::handleMessage(cMessage *msg){
                 EV << "VERİ BAŞARIYLA ALINDI." << endl;
         }
 
-        /* ########## CHECK SUSPICIOUS NODE ########## */
-        if(strcmp(msg->getName(), "TEST_MSG") == 0){
-            cMessage *testMsgResp = new cMessage("TEST_MSG_RESP");
-            int msgSenderIndex =  msg->par("TEST_MSG_SENDER_INDEX");
-            testMsgResp->addPar("DELAY");
-            testMsgResp->par("DELAY") = uniform(0, 1);
-            testMsgResp->addPar("TEST_RESP_MSG_SENDER_INDEX");
-            testMsgResp->par("TEST_RESP_MSG_SENDER_INDEX") = nodeIndex;
-            this->send(testMsgResp, msgSenderIndex);
-        }
-
-        if(strcmp(msg->getName(), "TEST_MSG_RESP") == 0){
-            double delay =  msg->par("DELAY").doubleValue();
-            double sender = msg->par("TEST_RESP_MSG_SENDER_INDEX");
-            EV << "DELAY : " << delay << " //// SENDER : " << sender << endl;
-            if (delay < delayTime) {
-                this->setAsNeighbor(sender);
-            }
-        }
-        /* ########## END - CHECK SUSPICIOUS NODE ########## */
-
          if(AODVMesajPaketiTipi::RREQ)
              handleRREQ(dynamic_cast<AODVRREQ*>(msg)); // alternatif : check_and_cast<AODVRREQ*>(msg)
 
@@ -171,10 +150,8 @@ void Node::handleHello(cMessage *msg){
     EV << " -- NODE::INDEX " << nodeIndex << " -- X::Y " << nodeKordinatX << "-" << nodeKordinatY << endl;
     EV << " -- SENDER::NODE::INDEX " << senderIndex << " -- X::Y " << gelenX << "-" << gelenY << endl;
 
-    if(uzaklik < radius && senderIndex != nodeIndex){
-        if(!isHelloAttack(receivedRss, senderIndex, sendingTime)) {
-            this->setAsNeighbor(senderIndex);
-        }
+    if(uzaklik < radius && senderIndex != nodeIndex) {
+        this->setAsNeighbor(senderIndex);
     }
 
     if(nodeIndex == kaynak) {
@@ -195,50 +172,7 @@ void Node::handleHello(cMessage *msg){
     }
 }
 
-void Node::setAsNeighbor(int senderIndex){
-    bool isThere = false;
-    for(int i=1; i<komsu.size(); i++){
-        if(komsu[i] == senderIndex){
-            isThere = true;
-        }
-    }
-
-    if(!isThere){
-        komsu.push_back(senderIndex);
-    }
-
-    EV << "--------- NEIGH. LIST --------" << endl;
-    for(int i=1; i<komsu.size(); i++){
-        EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
-    }
-    EV << "--------- END --------" << endl;
-}
-
-bool Node::isHelloAttack(int receivedRss, int senderIndex, double sendingTime) {
-    // malcs.
-    if(receivedRss > maxRss) {
-        EV << "Indexli Düğüm Zararlı" << senderIndex << endl;
-        return true;
-
-      // suspicious
-    } else if(receivedRss > avgRss) {
-
-        EV << ":::: SUPHELI INDEX :::: " << senderIndex << endl;
-        EV << ":::: BENIM INDEX --- SUPHELIYE MSG GONDERIYORUM :::: " << nodeIndex << endl;
-        EV << "SENDING TIME" << sendingTime << endl;
-        EV << "CURRENT TIME" << simTime().dbl() << endl;
-
-        cMessage *testMsg = new cMessage("TEST_MSG");
-        testMsg->addPar("TEST_MSG_SENDER_INDEX");
-        testMsg->par("TEST_MSG_SENDER_INDEX") = nodeIndex;
-
-        this->send(testMsg, senderIndex);
-    }
-
-    return false;
-}
-
-void Node::RREQ(){
+void Node::RREQ() {
 
     EV << "RREQ Gönderiliyor..." << endl;
 
@@ -253,7 +187,7 @@ void Node::RREQ(){
 
     cModule *node;
 
-    for (int i = 0; i < komsu.size(); i++) // sistemdeki t�m d���mlere yollanacak.
+    for (int i = 0; i < komsu.size(); i++)
     {
        node = flatTopologyModule->getSubmodule("nodes", komsu[i]);
 
@@ -264,10 +198,7 @@ void Node::RREQ(){
     }
 }
 
-
-void Node::handleRREQ(AODVRREQ *rreq){
-
-    //AODVRREQ *rreq = dynamic_cast<AODVRREQ*> (msg);
+void Node::handleRREQ(AODVRREQ *rreq) {
 
     if (rreq != nullptr) {
 
@@ -275,16 +206,16 @@ void Node::handleRREQ(AODVRREQ *rreq){
 
         guncelHopSayisi = rreq->getHopCount() + 1;
 
-        if(nodeIndex == hedef){
+        if (nodeIndex == hedef) {
 
 
-            if(hedefHerKomsudanBirRREPalsin < komsu.size()){
+            if (hedefHerKomsudanBirRREPalsin < komsu.size()) {
 
                 hedefHerKomsudanBirRREPalsin++;
 
                 EV << "###### HEDEF NodeE GELEN PAKETLER KARŞILAŞTIRILIYOR! ######" << endl;
 
-                if(enKucukHop > guncelHopSayisi || enKucukHop == 0){
+                if (enKucukHop > guncelHopSayisi || enKucukHop == 0) {
 
                     enKucukHop = guncelHopSayisi;
 
@@ -295,7 +226,7 @@ void Node::handleRREQ(AODVRREQ *rreq){
                     geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
                     geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
 
-                }else if(enBuyukHedefSiraNo < rreq->getHedefSeqNo()) {
+                } else if(enBuyukHedefSiraNo < rreq->getHedefSeqNo()) {
 
                     enBuyukHedefSiraNo = rreq->getHedefSeqNo();
 
@@ -306,10 +237,9 @@ void Node::handleRREQ(AODVRREQ *rreq){
                     geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
                     geriRotalama["hedefSeqNo"]  = enBuyukHedefSiraNo;
 
-                }else{}
+                }
 
                 for(int i=0; i<komsu.size(); i++){
-
                   EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
                 }
 
@@ -324,16 +254,13 @@ void Node::handleRREQ(AODVRREQ *rreq){
                     EV << "###### GERİ ROTALAMA TAMAMLANDI! ######" << endl << "-------------------------" << endl;
                     EV << "İlk RREP Gönderilecek Nodeün Index Bilgisi : " << geriRotalama["sonraki"] << endl;
 
-                    this->RREP(); // hedef ilk RREP mesajını buradan tetikliyor.
-                    //endSimulation();
+                    this->RREP();
                 }
+            }
 
-            }else{}
+        } else {
 
-
-        }else{
-
-           if(rreqId != rreq->getRreqId() && nodeIndex != kaynak){
+           if (rreqId != rreq->getRreqId() && nodeIndex != kaynak) {
 
                 geriRotalama["kaynak"]      = rreq->getKaynakAdr();
                 geriRotalama["hedef"]       = rreq->getHedefAdr();
@@ -352,20 +279,12 @@ void Node::handleRREQ(AODVRREQ *rreq){
 
                 rreqId = rreq->getRreqId();
                 this->RREQ();
-
-
-           }else{
-
-               //EV << "Bu broadcast beni ilgilendirmiyor : kaynak Node veya daha önceden alınan bir broadcast" << endl;
-               //EV << "RREQ ID Global : " << rreqId << endl << "Paketle gelen RREQ ID : " << rreq->getRreqId() << endl;
            }
         }
-
-    } else {}
+    }
 }
 
-
-void Node::RREP(){
+void Node::RREP() {
 
     EV << "RREP Gönderiliyor..." << endl;
 
@@ -380,9 +299,9 @@ void Node::RREP(){
     this->send(rrep, geriRotalama["sonraki"]);
 }
 
-void Node::handleRREP(AODVRREP *rrep){
+void Node::handleRREP(AODVRREP *rrep) {
 
-    if(rrep != nullptr){
+    if (rrep != nullptr) {
 
         if (nodeIndex != kaynak) {
 
@@ -411,7 +330,7 @@ void Node::handleRREP(AODVRREP *rrep){
 /*
  * It sends message from source to destination through route
  */
-void Node::sendData(const char* msg){
+void Node::sendData(const char* msg) {
 
     cMessage *message = new cMessage(msg);
     message->addPar("NODE_INDEX");
@@ -424,4 +343,23 @@ void Node::sendData(const char* msg){
 void Node::send(cMessage *msg, int receiver) {
     cModule *node = flatTopologyModule->getSubmodule("nodes", receiver);
     sendDirect(msg, node, "inputGate");
+}
+
+void Node::setAsNeighbor(int senderIndex) {
+    bool isThere = false;
+    for(int i=1; i< komsu.size(); i++){
+        if(komsu[i] == senderIndex){
+            isThere = true;
+        }
+    }
+
+    if(!isThere){
+        komsu.push_back(senderIndex);
+    }
+
+    EV << "--------- NEIGH. LIST --------" << endl;
+    for(int i=1; i<komsu.size(); i++){
+        EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
+    }
+    EV << "--------- END --------" << endl;
 }
