@@ -23,5 +23,8 @@ class Util {
         static double calculateDistance(int receiverX, int receiverY, int senderX, int senderY);
         static bool isMaliciousNode(string m, int nodeIndex);
         static bool isHelloAttack(int receivedRss, int senderIndex, double sendingTime);
+        static string vectorToString(vector<int> neighbors);
+        static string toString(double value);
+
 };
 #endif /* SRC_UTIL_H_ */

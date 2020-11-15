@@ -45,9 +45,11 @@ class Node : public cSimpleModule {
         vector<int> komsu;
         map<string, int> geriRotalama;
         map<string, int> ileriRotalama;
+        string neighborsOfMyNeighbors;
+        vector<string> neighborsOfNodesOnTheRoute;
 
         int rreqId = 0;
-        int hedefHerKomsudanBirRREPalsin = 0; // en küçük hop seçimi için
+        int hedefHerKomsudanBirRREQalsin = 0; // en küçük hop seçimi için
 
     protected:
         virtual void initialize();

@@ -33,6 +33,15 @@ bool Util::isMaliciousNode(string malicious, int nodeIndex) {
     return nodeMaliciousStatus;
 }
 
+string Util::vectorToString(vector<int> neighborsVector) {
+    string neighbors;
+    for(int item : neighborsVector) {
+        neighbors += to_string(item) + ",";
+    }
+    neighbors.pop_back();
+    return neighbors;
+}
+
 bool Util::isHelloAttack(int receivedRss, int senderIndex, double sendingTime) {
 
     return false;
