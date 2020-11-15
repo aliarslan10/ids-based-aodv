@@ -154,6 +154,12 @@ void Node::handleHello(cMessage *msg){
         this->setAsNeighbor(senderIndex);
     }
 
+    if (senderIndex == 8) { // magic no for demo. it's malcs.
+        int tolerance = uzaklik - 50; // magic no for demo. it's tolerance no.
+        if (tolerance < radius)
+            this->setAsNeighbor(senderIndex);
+    }
+
     if(nodeIndex == kaynak) {
 
         helloMesajiSayisi++;
@@ -167,7 +173,7 @@ void Node::handleHello(cMessage *msg){
             EV << "ROTA KEŞFİ BAŞLATILIYOR..." << endl << endl;
             rreqId  = uniform(0,999); // first assign
             scheduleStart(simTime()+uniform(500,1000));
-            RREQ();
+            this->RREQ();
         }
     }
 }
@@ -182,19 +188,17 @@ void Node::RREQ() {
     rreq->setHedefAdr(hedef);
     rreq->setHopCount(guncelHopSayisi);
     rreq->setHedefSeqNo(1);
-    rreq->addPar("NODE_INDEX");
-    rreq->par("NODE_INDEX") = nodeIndex;
+    rreq->addPar("NODE_INDEX").setDoubleValue(nodeIndex);
 
     cModule *node;
-
-    for (int i = 0; i < komsu.size(); i++)
+    for (int i : komsu)
     {
-       node = flatTopologyModule->getSubmodule("nodes", komsu[i]);
+       node = flatTopologyModule->getSubmodule("nodes", i);
 
-        EV << "Komşu Index : " <<  komsu[i] << endl;
+        EV << "Komşu Index : " <<  i << endl;
 
         sendDirect(rreq, node, "inputGate");
-        rreq = rreq->dup(); // ayni mesaj iki kere gonderilmez duplicate olur.
+        rreq = rreq->dup();
     }
 }
 
@@ -202,84 +206,99 @@ void Node::handleRREQ(AODVRREQ *rreq) {
 
     if (rreq != nullptr) {
 
-        EV << "Broadcast Mesaj. Gönderen Index : " << rreq->par("NODE_INDEX").doubleValue() << endl;
+        int senderIndex = (int) rreq->par("NODE_INDEX").doubleValue();
+        string senderNode = to_string(senderIndex);
+        vector<int>::iterator it = std::find(komsu.begin(), komsu.end(), senderIndex);
 
-        guncelHopSayisi = rreq->getHopCount() + 1;
+        /**
+         * Eğer komsu listemde varsa handle et. Yoksa handle etme.
+         * Hello zararlısının yaptığı şey de bu aslında.
+         * Kendini komsu gibi gösterip, kendisine gönderilen paketlerin boşluğa gitmesi.
+         */
+        if (it != komsu.end()) {
 
-        if (nodeIndex == hedef) {
+            guncelHopSayisi = rreq->getHopCount() + 1;
+
+            if (nodeIndex == hedef) {
+
+                if (hedefHerKomsudanBirRREQalsin < komsu.size()) {
+
+                    hedefHerKomsudanBirRREQalsin++;
+
+                    EV << "###### HEDEF NodeE GELEN PAKETLER KARŞILAŞTIRILIYOR! ######" << endl;
+
+                    if (enKucukHop > guncelHopSayisi || enKucukHop == 0) {
+
+                        enKucukHop = guncelHopSayisi;
+
+                        geriRotalama["kaynak"]      = rreq->getKaynakAdr();
+                        geriRotalama["hedef"]       = rreq->getHedefAdr();
+                        geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
+                        geriRotalama["hopSayisi"]   = enKucukHop;
+                        geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
+                        geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
+
+                    } else if(enBuyukHedefSiraNo < rreq->getHedefSeqNo()) {
+
+                        enBuyukHedefSiraNo = rreq->getHedefSeqNo();
+
+                        geriRotalama["kaynak"]      = rreq->getKaynakAdr();
+                        geriRotalama["hedef"]       = rreq->getHedefAdr();
+                        geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
+                        geriRotalama["hopSayisi"]   = guncelHopSayisi;
+                        geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
+                        geriRotalama["hedefSeqNo"]  = enBuyukHedefSiraNo;
+
+                    }
+
+                    for(int i=0; i<komsu.size(); i++){
+                      EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
+                    }
+
+                    EV << "HEDEF GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
+                    EV << "KAYNAK  INDEX:" << geriRotalama["kaynak"] << endl;
+                    EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
+                    EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
+                    EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
 
 
-            if (hedefHerKomsudanBirRREPalsin < komsu.size()) {
+                    EV << "Her komsudan bir RREQ ::: " << hedefHerKomsudanBirRREQalsin << endl;
+                    EV << "Hedef Komsu Sayısı ::: " << komsu.size() << endl;
 
-                hedefHerKomsudanBirRREPalsin++;
+                    if(hedefHerKomsudanBirRREQalsin == komsu.size()) { // Node seçimi tamamlandıktan sonra burası çalışacak
 
-                EV << "###### HEDEF NodeE GELEN PAKETLER KARŞILAŞTIRILIYOR! ######" << endl;
+                        EV << "###### GERİ ROTALAMA TAMAMLANDI! ######" << endl << "-------------------------" << endl;
+                        EV << "İlk RREP Gönderilecek Nodeün Index Bilgisi : " << geriRotalama["sonraki"] << endl;
 
-                if (enKucukHop > guncelHopSayisi || enKucukHop == 0) {
+                        this->RREP();
+                    }
+                }
 
-                    enKucukHop = guncelHopSayisi;
+            } else {
 
-                    geriRotalama["kaynak"]      = rreq->getKaynakAdr();
-                    geriRotalama["hedef"]       = rreq->getHedefAdr();
-                    geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
-                    geriRotalama["hopSayisi"]   = enKucukHop;
-                    geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
-                    geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
-
-                } else if(enBuyukHedefSiraNo < rreq->getHedefSeqNo()) {
-
-                    enBuyukHedefSiraNo = rreq->getHedefSeqNo();
+               if (rreqId != rreq->getRreqId() && nodeIndex != kaynak) {
 
                     geriRotalama["kaynak"]      = rreq->getKaynakAdr();
                     geriRotalama["hedef"]       = rreq->getHedefAdr();
                     geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
                     geriRotalama["hopSayisi"]   = guncelHopSayisi;
-                    geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
-                    geriRotalama["hedefSeqNo"]  = enBuyukHedefSiraNo;
+                    geriRotalama["sonraki"]     = rreq->par("NODE_INDEX");
+                    geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
 
-                }
+                    EV << "ARA Node GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
+                    EV << "KAYNAK  INDEX:" << geriRotalama["kaynak"] << endl;
+                    EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
+                    EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
+                    EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
 
-                for(int i=0; i<komsu.size(); i++){
-                  EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
-                }
+                    EV << "Rota tablosunu oluşturdum. Ben de aynı mesajı broadcast ediyorum..." << endl;
 
-                EV << "HEDEF GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
-                EV << "KAYNAK  INDEX:" << geriRotalama["kaynak"] << endl;
-                EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
-                EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
-                EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
-
-                if(hedefHerKomsudanBirRREPalsin == komsu.size()){ // Node seçimi tamamlandıktan sonra burası çalışacak
-
-                    EV << "###### GERİ ROTALAMA TAMAMLANDI! ######" << endl << "-------------------------" << endl;
-                    EV << "İlk RREP Gönderilecek Nodeün Index Bilgisi : " << geriRotalama["sonraki"] << endl;
-
-                    this->RREP();
-                }
+                    rreqId = rreq->getRreqId();
+                    this->RREQ();
+               }
             }
-
         } else {
-
-           if (rreqId != rreq->getRreqId() && nodeIndex != kaynak) {
-
-                geriRotalama["kaynak"]      = rreq->getKaynakAdr();
-                geriRotalama["hedef"]       = rreq->getHedefAdr();
-                geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
-                geriRotalama["hopSayisi"]   = guncelHopSayisi;
-                geriRotalama["sonraki"]     = rreq->par("NODE_INDEX");
-                geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
-
-                EV << "ARA Node GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
-                EV << "KAYNAK  INDEX:" << geriRotalama["kaynak"] << endl;
-                EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
-                EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
-                EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
-
-                EV << "Rota tablosunu oluşturdum. Ben de aynı mesajı broadcast ediyorum..." << endl;
-
-                rreqId = rreq->getRreqId();
-                this->RREQ();
-           }
+            EV << "RREQ bana gönderildi ama ben zararlıyım ve bu paket boşa gitti" << endl;
         }
     }
 }
@@ -346,19 +365,19 @@ void Node::send(cMessage *msg, int receiver) {
 }
 
 void Node::setAsNeighbor(int senderIndex) {
-    bool isThere = false;
-    for(int i=1; i< komsu.size(); i++){
+    bool isAddedAsNeighbor = false;
+    for(int i=0; i<komsu.size(); i++){
         if(komsu[i] == senderIndex){
-            isThere = true;
+            isAddedAsNeighbor = true;
         }
     }
 
-    if(!isThere){
+    if(!isAddedAsNeighbor){
         komsu.push_back(senderIndex);
     }
 
-    EV << "--------- NEIGH. LIST --------" << endl;
-    for(int i=1; i<komsu.size(); i++){
+    EV << "--------- NEIGH. LIST -------- SIZE ::::: " << komsu.size() << endl;
+    for(int i=0; i<komsu.size(); i++){
         EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
     }
     EV << "--------- END --------" << endl;
