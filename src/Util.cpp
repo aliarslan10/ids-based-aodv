@@ -33,7 +33,11 @@ bool Util::isMaliciousNode(string malicious, int nodeIndex) {
     return nodeMaliciousStatus;
 }
 
-bool Util::isHelloAttack(int receivedRss, int senderIndex, double sendingTime) {
+vector<int> Util::checkMaliciousNodes(vector<int> neighbors, vector<int> rreqSenders) {
 
-    return false;
+    for(int sender : rreqSenders) {
+        neighbors.erase(std::remove(neighbors.begin(), neighbors.end(), sender), neighbors.end());
+    }
+
+    return neighbors;
 }

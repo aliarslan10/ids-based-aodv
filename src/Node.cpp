@@ -78,6 +78,15 @@ void Node::handleMessage(cMessage *msg){
 
     if(msg != nullptr){
 
+        if (strcmp(msg->getName(), "WAKE_AND_CHECK_MALCS_ON_DEST") == 0){
+            if(receivedRreqCount != komsu.size()) {
+                vector<int> malcs = Util::checkMaliciousNodes(komsu, rreqSenders);
+                for (int i : malcs) {
+                    EV << "MLCS : " << i << " - alarm üretilecek "<< endl;
+                }
+            }
+        }
+
         if (strcmp(msg->getName(), "BASLAT") == 0){
 
            EV << "Hello Mesajı İle Komşular Belirleniyor.." << endl;
@@ -130,7 +139,6 @@ void Node::handleMessage(cMessage *msg){
          if(AODVMesajPaketiTipi::RREP)
              handleRREP(dynamic_cast<AODVRREP*>(msg));
     }
-
 }
 
 void Node::handleHello(cMessage *msg){
@@ -154,7 +162,10 @@ void Node::handleHello(cMessage *msg){
         this->setAsNeighbor(senderIndex);
     }
 
-    if (senderIndex == 8) { // magic no for demo. it's malcs.
+    ////////
+    //// BURADAKİ MAGIC NUMBER IMPLEMENTE EDİLECEK
+    ///////
+    if (senderIndex == 4 || senderIndex == 8) { // magic no for demo. it's malcs.
         int tolerance = uzaklik - 50; // magic no for demo. it's tolerance no.
         if (tolerance < radius)
             this->setAsNeighbor(senderIndex);
@@ -207,7 +218,6 @@ void Node::handleRREQ(AODVRREQ *rreq) {
     if (rreq != nullptr) {
 
         int senderIndex = (int) rreq->par("NODE_INDEX").doubleValue();
-        string senderNode = to_string(senderIndex);
         vector<int>::iterator it = std::find(komsu.begin(), komsu.end(), senderIndex);
 
         /**
@@ -218,12 +228,12 @@ void Node::handleRREQ(AODVRREQ *rreq) {
         if (it != komsu.end()) {
 
             guncelHopSayisi = rreq->getHopCount() + 1;
+            rreqSenders.push_back(senderIndex);
+            receivedRreqCount = rreqSenders.size();
 
             if (nodeIndex == hedef) {
 
-                if (hedefHerKomsudanBirRREQalsin < komsu.size()) {
-
-                    hedefHerKomsudanBirRREQalsin++;
+                if (receivedRreqCount <= komsu.size()) {
 
                     EV << "###### HEDEF NodeE GELEN PAKETLER KARŞILAŞTIRILIYOR! ######" << endl;
 
@@ -262,15 +272,24 @@ void Node::handleRREQ(AODVRREQ *rreq) {
                     EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
 
 
-                    EV << "Her komsudan bir RREQ ::: " << hedefHerKomsudanBirRREQalsin << endl;
+                    EV << "Her komsudan bir RREQ ::: " << receivedRreqCount << endl;
                     EV << "Hedef Komsu Sayısı ::: " << komsu.size() << endl;
 
-                    if(hedefHerKomsudanBirRREQalsin == komsu.size()) { // Node seçimi tamamlandıktan sonra burası çalışacak
+                    if(receivedRreqCount == komsu.size()) { // Node seçimi tamamlandıktan sonra burası çalışacak
 
                         EV << "###### GERİ ROTALAMA TAMAMLANDI! ######" << endl << "-------------------------" << endl;
                         EV << "İlk RREP Gönderilecek Nodeün Index Bilgisi : " << geriRotalama["sonraki"] << endl;
 
                         this->RREP();
+                        cMessage *msg = new cMessage("WAKE_AND_CHECK_MALCS_ON_DEST");
+                        cancelAndDelete(msg); // planlanmış scheduleAt eventini siler
+                    }
+
+                    if (setMalcsControllerOnDest) {
+                        setMalcsControllerOnDest = false;
+                        cMessage *msg = new cMessage("WAKE_AND_CHECK_MALCS_ON_DEST");
+                        double delay = 0.1 * komsu.size();
+                        scheduleAt(simTime()+delay, msg);
                     }
                 }
 
@@ -312,8 +331,7 @@ void Node::RREP() {
     rrep->setHedefAdr(kaynak);
     rrep->setHopCount(guncelHopSayisi);
     rrep->setHedefSeqNo(2); // Sadece ilk RREP tarafından arttırılabilir.
-    rrep->addPar("NODE_INDEX");
-    rrep->par("NODE_INDEX") = nodeIndex;
+    rrep->addPar("NODE_INDEX").setDoubleValue(nodeIndex);
 
     this->send(rrep, geriRotalama["sonraki"]);
 }
@@ -331,7 +349,20 @@ void Node::handleRREP(AODVRREP *rrep) {
             ileriRotalama["hopSayisi"]   = guncelHopSayisi;
             ileriRotalama["sonraki"]     = rrep->par("NODE_INDEX");
 
-            RREP();
+            int senderIndex = (int) rrep->par("NODE_INDEX").doubleValue();
+
+            EV << "kayank " << senderIndex << endl;
+            EV << "hedef " << hedef << endl;
+
+            if (senderIndex != hedef && komsu.size() != rreqSenders.size()) {
+                vector<int> malcs = Util::checkMaliciousNodes(komsu, rreqSenders);
+                for (int i : malcs) {
+                    EV << "MLCS : " << i << " - alarm üretilecek "<< endl;
+                }
+            } else {
+                this->RREP();
+            }
+
 
         } else {
             ileriRotalama["kaynak"]      = rrep->getHedefAdr();

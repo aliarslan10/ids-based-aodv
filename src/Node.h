@@ -11,7 +11,6 @@
 #include <string.h>
 #include <omnetpp.h>
 #include <unistd.h>
-#include <algorithm>
 
 using namespace omnetpp;
 using namespace std;
@@ -43,13 +42,15 @@ class Node : public cSimpleModule {
         const char* zararlilar;
 
         vector<int> komsu;
+        vector<int> rreqSenders;
         map<string, int> geriRotalama;
         map<string, int> ileriRotalama;
         string neighborsOfMyNeighbors;
         vector<string> neighborsOfNodesOnTheRoute;
+        bool setMalcsControllerOnDest = true;
 
         int rreqId = 0;
-        int hedefHerKomsudanBirRREQalsin = 0; // en küçük hop seçimi için
+        int receivedRreqCount = 0; // en küçük hop seçimi için
 
     protected:
         virtual void initialize();

@@ -12,6 +12,7 @@
 #include <sstream>
 #include <iostream>
 #include <cstdlib>
+#include <algorithm>
 
 using namespace std;
 
@@ -22,6 +23,6 @@ class Util {
     public:
         static double calculateDistance(int receiverX, int receiverY, int senderX, int senderY);
         static bool isMaliciousNode(string m, int nodeIndex);
-        static bool isHelloAttack(int receivedRss, int senderIndex, double sendingTime);
+        static vector<int> checkMaliciousNodes(vector<int> neighbors, vector<int> rreqSenders);
 };
 #endif /* SRC_UTIL_H_ */
