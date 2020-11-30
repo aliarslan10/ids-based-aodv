@@ -24,5 +24,6 @@ class Util {
         static double calculateDistance(int receiverX, int receiverY, int senderX, int senderY);
         static bool isMaliciousNode(string m, int nodeIndex);
         static vector<int> checkMaliciousNodes(vector<int> neighbors, vector<int> rreqSenders);
+        static string vectorToString(vector<int> neighbors);
 };
 #endif /* SRC_UTIL_H_ */

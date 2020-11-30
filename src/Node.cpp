@@ -81,11 +81,38 @@ void Node::handleMessage(cMessage *msg){
         if (strcmp(msg->getName(), "WAKE_AND_CHECK_MALCS_ON_DEST") == 0){
             if(receivedRreqCount != komsu.size()) {
                 vector<int> malcs = Util::checkMaliciousNodes(komsu, rreqSenders);
-                for (int i : malcs) {
-                    EV << "MLCS : " << i << " - alarm üretilecek "<< endl;
+                if (malcs.size() > 1) {
+                    /** TODO: broadcast one alarm for multi malcs
+                     * Node::alarm(malcs);  get as a vector
+                     */
+                }
+                else {
+                    Node::alarm(malcs.front());
                 }
             }
         }
+
+
+        if (strcmp(msg->getName(), "ALARM") == 0){
+            Node::handleAlarm(msg);
+        }
+
+        if (strcmp(msg->getName(), "ALARM_BROADCAST") == 0){
+
+            rreqSenders.clear();
+
+            int malcsNodeIndex = (int) msg->par("MLCS_NODE_INDEX").doubleValue();
+            blackList.push_back(malcsNodeIndex);
+            EV << "komsu listsinden cıkardım " << malcsNodeIndex << endl;
+
+            // remove from my neighb.
+            komsu.erase(std::remove(komsu.begin(), komsu.end(), malcsNodeIndex), komsu.end());
+
+            if (nodeIndex == kaynak) {
+                this->RREQ();
+            }
+        }
+
 
         if (strcmp(msg->getName(), "BASLAT") == 0){
 
@@ -105,14 +132,8 @@ void Node::handleMessage(cMessage *msg){
            hello->addPar("SENDING_TIME");
            hello->par("SENDING_TIME") = simTime().dbl();
            EV << "Gönderdiğim RSS " << rss << endl;
-           cModule *node;
 
-           for (int i = 0; i < nodeSayisi; i++) // sistemdeki dugumlere yollanacak.
-           {
-                node = flatTopologyModule->getSubmodule("nodes", i);
-                sendDirect(hello, node, "inputGate");
-                hello = hello->dup();
-            }
+           this->broadcast(hello);
         }
 
 
@@ -164,8 +185,9 @@ void Node::handleHello(cMessage *msg){
 
     ////////
     //// BURADAKİ MAGIC NUMBER IMPLEMENTE EDİLECEK
-    ///////
-    if (senderIndex == 4 || senderIndex == 8) { // magic no for demo. it's malcs.
+    //////
+    /**/
+    if (senderIndex == 3) { // magic no for demo. it's malcs.
         int tolerance = uzaklik - 50; // magic no for demo. it's tolerance no.
         if (tolerance < radius)
             this->setAsNeighbor(senderIndex);
@@ -193,20 +215,35 @@ void Node::RREQ() {
 
     EV << "RREQ Gönderiliyor..." << endl;
 
+
+    if (nodeIndex == kaynak) {
+        round++;
+        EV << "ROUND " << round << endl;
+        EV << "receivedRreqCount " << receivedRreqCount << endl;
+        if (round > currentRound){
+            rreqId++;
+            hedefSeqNo++;
+            route = "";
+            currentRound = round;
+        }
+    }
+
     AODVRREQ *rreq = new AODVRREQ("RREQ");
     rreq->setKaynakAdr(kaynak);
     rreq->setRreqId(rreqId);
     rreq->setHedefAdr(hedef);
     rreq->setHopCount(guncelHopSayisi);
-    rreq->setHedefSeqNo(1);
+    rreq->setHedefSeqNo(hedefSeqNo);
     rreq->addPar("NODE_INDEX").setDoubleValue(nodeIndex);
+    rreq->addPar("NEIGHBORS_STORAGE").setStringValue((route).c_str());
 
     cModule *node;
+
     for (int i : komsu)
     {
        node = flatTopologyModule->getSubmodule("nodes", i);
 
-        EV << "Komşu Index : " <<  i << endl;
+        EV << "RREQ Gönderilen Komşu : " <<  i << endl;
 
         sendDirect(rreq, node, "inputGate");
         rreq = rreq->dup();
@@ -218,6 +255,7 @@ void Node::handleRREQ(AODVRREQ *rreq) {
     if (rreq != nullptr) {
 
         int senderIndex = (int) rreq->par("NODE_INDEX").doubleValue();
+        string senderNode = to_string(senderIndex);
         vector<int>::iterator it = std::find(komsu.begin(), komsu.end(), senderIndex);
 
         /**
@@ -227,17 +265,47 @@ void Node::handleRREQ(AODVRREQ *rreq) {
          */
         if (it != komsu.end()) {
 
+            string senderStorage(rreq->par("NEIGHBORS_STORAGE").stringValue());
+            route = (senderNode + "," + senderStorage);
+            if (nodeIndex == hedef) {
+                neighborsOfNodesOnTheRoute.push_back(route);
+                EV << "Route : " <<  route << endl;
+            }
+
+
+            //check rreq on dest
+            if (rreqId != rreq->getRreqId() && nodeIndex == hedef) {
+                setMalcsControllerOnDest = true;
+                rreqSenders.clear();
+                rreqId = rreq->getRreqId();
+                guncelHopSayisi = 0;
+                enBuyukHedefSiraNo = 0;
+            }
+
             guncelHopSayisi = rreq->getHopCount() + 1;
             rreqSenders.push_back(senderIndex);
             receivedRreqCount = rreqSenders.size();
 
+            EV << "NODE IND - HEDEF " << nodeIndex << " - " << hedef << endl;
+
             if (nodeIndex == hedef) {
+
+                EV << "receivedRreqCount - komsu.size " << receivedRreqCount << " - " << komsu.size() << endl;
+
+                //// BURADAKİ IF _ ELSE'LERE GİRME SORUNU !!!!
 
                 if (receivedRreqCount <= komsu.size()) {
 
                     EV << "###### HEDEF NodeE GELEN PAKETLER KARŞILAŞTIRILIYOR! ######" << endl;
 
+                    EV << "enKucukHop :" << enKucukHop << endl;
+                    EV << "guncelHopSayisi:" << guncelHopSayisi << endl;
+                    EV << "enBuyukHedefSiraNo :" << enBuyukHedefSiraNo << endl;
+                    EV << "rreq->getHedefSeqNo()   :" <<  rreq->getHedefSeqNo() << endl;
+
                     if (enKucukHop > guncelHopSayisi || enKucukHop == 0) {
+
+                        EV << "###### ilk geri rotalama ######" << round<<  endl;
 
                         enKucukHop = guncelHopSayisi;
 
@@ -278,19 +346,22 @@ void Node::handleRREQ(AODVRREQ *rreq) {
                     if(receivedRreqCount == komsu.size()) { // Node seçimi tamamlandıktan sonra burası çalışacak
 
                         EV << "###### GERİ ROTALAMA TAMAMLANDI! ######" << endl << "-------------------------" << endl;
-                        EV << "İlk RREP Gönderilecek Nodeün Index Bilgisi : " << geriRotalama["sonraki"] << endl;
+                        EV << "İlk RREP Gönderilecek Node Index Bilgisi : " << geriRotalama["sonraki"] << endl;
 
                         this->RREP();
                         cMessage *msg = new cMessage("WAKE_AND_CHECK_MALCS_ON_DEST");
                         cancelAndDelete(msg); // planlanmış scheduleAt eventini siler
+                        EV << " planlanmış scheduleAt eventini siler " << endl;
                     }
 
                     if (setMalcsControllerOnDest) {
+                        EV << " !hadi " << endl;
                         setMalcsControllerOnDest = false;
                         cMessage *msg = new cMessage("WAKE_AND_CHECK_MALCS_ON_DEST");
                         double delay = 0.1 * komsu.size();
                         scheduleAt(simTime()+delay, msg);
                     }
+
                 }
 
             } else {
@@ -324,7 +395,7 @@ void Node::handleRREQ(AODVRREQ *rreq) {
 
 void Node::RREP() {
 
-    EV << "RREP Gönderiliyor..." << endl;
+    EV << "RREP Gönderiliyor... " << geriRotalama["sonraki"] << endl;
 
     AODVRREP *rrep = new AODVRREP("RREP");
     rrep->setKaynakAdr(hedef);
@@ -351,13 +422,15 @@ void Node::handleRREP(AODVRREP *rrep) {
 
             int senderIndex = (int) rrep->par("NODE_INDEX").doubleValue();
 
-            EV << "kayank " << senderIndex << endl;
+            EV << "kaynak " << senderIndex << endl;
             EV << "hedef " << hedef << endl;
+            EV << "komsu.size() " << komsu.size() << endl;
+            EV << "rreqSenders.size() " << rreqSenders.size() << endl;
 
             if (senderIndex != hedef && komsu.size() != rreqSenders.size()) {
                 vector<int> malcs = Util::checkMaliciousNodes(komsu, rreqSenders);
                 for (int i : malcs) {
-                    EV << "MLCS : " << i << " - alarm üretilecek "<< endl;
+                    Node::alarm(i);
                 }
             } else {
                 this->RREP();
@@ -413,3 +486,40 @@ void Node::setAsNeighbor(int senderIndex) {
     }
     EV << "--------- END --------" << endl;
 }
+
+// unicast alarm to inform destination
+void Node::alarm(int malcsNodeIndex) {
+    EV << "Malicious node is detected. MalcsId: " << malcsNodeIndex << endl;
+    cMessage *alarm = new cMessage("ALARM");
+    alarm->addPar("MLCS_NODE_INDEX").setDoubleValue(malcsNodeIndex);
+    if(nodeIndex != hedef) {
+        this->send(alarm, ileriRotalama["sonraki"]);
+    } else {
+        this->broadcastAlarm(malcsNodeIndex);
+    }
+}
+
+void Node::handleAlarm(cMessage *msg) {
+    int malcsNodeIndex = (int) msg->par("MLCS_NODE_INDEX").doubleValue();
+    if(nodeIndex != hedef) {
+        this->alarm(malcsNodeIndex);
+    } else {
+        this->broadcastAlarm(malcsNodeIndex);
+    }
+}
+
+void Node::broadcastAlarm(int malcsNodeIndex){
+    cMessage *alarm = new cMessage("ALARM_BROADCAST");
+    komsu.erase(std::remove(komsu.begin(), komsu.end(), malcsNodeIndex), komsu.end());
+    alarm->addPar("MLCS_NODE_INDEX").setDoubleValue(malcsNodeIndex);
+    Node::broadcast(alarm);
+}
+
+void Node::broadcast(cMessage *msg) {
+    for (int i = 0; i < nodeSayisi; i++) {
+        cModule *node = flatTopologyModule->getSubmodule("nodes", i);
+        sendDirect(msg, node, "inputGate");
+        msg = msg->dup();
+    }
+}
+

@@ -42,15 +42,21 @@ class Node : public cSimpleModule {
         const char* zararlilar;
 
         vector<int> komsu;
+        vector<int> routes;
+        string route;
         vector<int> rreqSenders;
         map<string, int> geriRotalama;
         map<string, int> ileriRotalama;
         string neighborsOfMyNeighbors;
         vector<string> neighborsOfNodesOnTheRoute;
         bool setMalcsControllerOnDest = true;
+        vector<int> blackList;
 
         int rreqId = 0;
         int receivedRreqCount = 0; // en küçük hop seçimi için
+        int round = 0;
+        int currentRound = 1;
+        int hedefSeqNo = 1;
 
     protected:
         virtual void initialize();
@@ -65,6 +71,10 @@ class Node : public cSimpleModule {
         void sendDelay(cMessage *msg, float delayTime, int receiver);
         void start();
         void setAsNeighbor(int senderNodeIndex);
+        void alarm(int malcsNodeIndex);
+        void handleAlarm(cMessage *msg);
+        void broadcastAlarm(int malcsNodeIndex);
+        void broadcast(cMessage *msg);
 };
 
 #endif /* NODE_H_ */
