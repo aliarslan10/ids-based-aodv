@@ -1,3 +1,3 @@
 ## IDS Based AODV - UML Diagram
 
-![resim.png](./resim.png)
+![uml-diagram.jpg](./uml-diagram.jpg)
