@@ -16,8 +16,11 @@ using namespace omnetpp;
 using namespace std;
 
 cModule *flatTopologyModule;
+cModule *node;
 
 const int RANDOM_NUMBER_GENERATOR = 2; // omnet.ini seed number
+
+enum MSG_TYPE{ SENDING, RECEIVING, BROADCAST };
 
 class Node : public cSimpleModule {
     private:
@@ -58,6 +61,25 @@ class Node : public cSimpleModule {
         int currentRound = 1;
         int hedefSeqNo = 1;
 
+        double eElec;
+        double eMp;
+        double eFs;
+        double eDa;
+        int alfa1;
+        int alfa2;
+        int thDistance;
+        double maxDistanceInTopology;
+
+        double battery;
+        double initialBattery;
+        bool isBatteryFull = true;
+        double consumedEnergy = 0;
+        double totalConsumedEnergy = 0;
+
+        int packetSize;
+        int dataPacketSize;
+
+
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
@@ -75,6 +97,9 @@ class Node : public cSimpleModule {
         void handleAlarm(cMessage *msg);
         void broadcastAlarm(int malcsNodeIndex);
         void broadcast(cMessage *msg);
+        void newRound();
+        void decreaseBattery(double distance, int msgSendingType, int payload);
+        void checkBattery();
 };
 
 #endif /* NODE_H_ */

@@ -21,7 +21,8 @@ using namespace std;
 
 class Util {
     public:
-        static double calculateDistance(int receiverX, int receiverY, int senderX, int senderY);
+        static double calculateTwoNodeDistance(int receiverX, int receiverY, int senderX, int senderY);
+        static double calculateDiagonalDistance(int xSideLength, int ySideLength);
         static bool isMaliciousNode(string m, int nodeIndex);
         static vector<int> checkMaliciousNodes(vector<int> neighbors, vector<int> rreqSenders);
         static string vectorToString(vector<int> neighbors);

@@ -14,6 +14,10 @@ Define_Module(Node);
 
 void Node::initialize(){
 
+    node = getModuleByPath(this->getFullPath().c_str());
+    nodeId = this->getId();
+    nodeIndex  = this->getIndex();
+
     flatTopologyModule = getModuleByPath("FlatTopology");
     nodeSayisi = flatTopologyModule->par("nodeSayisi");
     kaynak = flatTopologyModule->par("kaynak");
@@ -26,8 +30,10 @@ void Node::initialize(){
     delayTime = flatTopologyModule->par("delayTime");
     attackMode = flatTopologyModule->par("attackMode");
     zararlilar = flatTopologyModule->par("zararlilar");
-    nodeId = this->getId();
-    nodeIndex  = this->getIndex();
+    packetSize = flatTopologyModule->par("packetSize");
+    dataPacketSize = flatTopologyModule->par("dataPacketSize");
+    initialBattery = node->par("battery").doubleValue();
+    battery = initialBattery;
 
     stringstream topolojiBoyutuX;
     topolojiBoyutuX << flatTopologyModule->getDisplayString().getTagArg("bgb",0);
@@ -37,9 +43,11 @@ void Node::initialize(){
     topolojiBoyutuY << flatTopologyModule->getDisplayString().getTagArg("bgb",1);
     topolojiBoyutuY >> topolojiY;
 
+    maxDistanceInTopology = Util::calculateDiagonalDistance(topolojiX, topolojiY);
+
     // 3. parametre omnet.ini dosyasında yer alan seed-no. toplam 6tane var.
-    nodeKordinatX  = intuniform (5,400,RANDOM_NUMBER_GENERATOR);
-    nodeKordinatY  = intuniform (5,150,RANDOM_NUMBER_GENERATOR);
+    nodeKordinatX  = intuniform (5,topolojiX,RANDOM_NUMBER_GENERATOR);
+    nodeKordinatY  = intuniform (5,topolojiY,RANDOM_NUMBER_GENERATOR);
     getDisplayString().setTagArg("p", 0, nodeKordinatX);
     getDisplayString().setTagArg("p", 1, nodeKordinatY);
     getDisplayString().setTagArg("r", 0, radius);
@@ -62,6 +70,17 @@ void Node::initialize(){
         }
     }
 
+    /*
+     * GET LEACH ENERGY MODEL PARAMETERS
+     */
+    eElec = flatTopologyModule->par("eElec").doubleValue();
+    eMp = flatTopologyModule->par("eMp").doubleValue();
+    eFs = flatTopologyModule->par("eFs").doubleValue();
+    eDa = flatTopologyModule->par("eDa").doubleValue();
+    alfa1 = flatTopologyModule->par("alfa1");
+    alfa2 = flatTopologyModule->par("alfa2");
+    thDistance = flatTopologyModule->par("thDistance");
+
     start();
 }
 
@@ -77,6 +96,8 @@ void Node::start(){
 void Node::handleMessage(cMessage *msg){
 
     if(msg != nullptr){
+
+        this->decreaseBattery(0, MSG_TYPE::RECEIVING, packetSize);
 
         if (strcmp(msg->getName(), "WAKE_AND_CHECK_MALCS_ON_DEST") == 0){
             if(receivedRreqCount != komsu.size()) {
@@ -165,15 +186,13 @@ void Node::handleMessage(cMessage *msg){
 void Node::handleHello(cMessage *msg){
 
     int senderIndex = msg->par("HELLO_INDEX");
-    int senderId = msg->par("HELLO_NODE_ID");
     int gelenX = msg->par("HELLO_X");
     int gelenY = msg->par("HELLO_Y");
     int receivedRss = msg->par("RSS");
-    double sendingTime = msg->par("SENDING_TIME");
 
     EV <<  "HANDLE HELLO - GELEN RSS: " << receivedRss << endl;
 
-    double uzaklik = Util::calculateDistance(nodeKordinatX, nodeKordinatY, gelenX, gelenY);
+    double uzaklik = Util::calculateTwoNodeDistance(nodeKordinatX, nodeKordinatY, gelenX, gelenY);
 
     EV << "Uzaklık : " << uzaklik << endl;
     EV << " -- NODE::INDEX " << nodeIndex << " -- X::Y " << nodeKordinatX << "-" << nodeKordinatY << endl;
@@ -211,11 +230,7 @@ void Node::handleHello(cMessage *msg){
     }
 }
 
-void Node::RREQ() {
-
-    EV << "RREQ Gönderiliyor..." << endl;
-
-
+void Node::newRound() {
     if (nodeIndex == kaynak) {
         round++;
         EV << "ROUND " << round << endl;
@@ -227,6 +242,13 @@ void Node::RREQ() {
             currentRound = round;
         }
     }
+}
+
+void Node::RREQ() {
+
+    EV << "RREQ Gönderiliyor..." << endl;
+
+    this->newRound();
 
     AODVRREQ *rreq = new AODVRREQ("RREQ");
     rreq->setKaynakAdr(kaynak);
@@ -248,6 +270,8 @@ void Node::RREQ() {
         sendDirect(rreq, node, "inputGate");
         rreq = rreq->dup();
     }
+
+    this->decreaseBattery(0, MSG_TYPE::BROADCAST, packetSize);
 }
 
 void Node::handleRREQ(AODVRREQ *rreq) {
@@ -405,6 +429,7 @@ void Node::RREP() {
     rrep->addPar("NODE_INDEX").setDoubleValue(nodeIndex);
 
     this->send(rrep, geriRotalama["sonraki"]);
+    this->decreaseBattery(0, MSG_TYPE::SENDING, packetSize);
 }
 
 void Node::handleRREP(AODVRREP *rrep) {
@@ -461,11 +486,13 @@ void Node::sendData(const char* msg) {
     message->addPar("NODE_ID");
     message->par("NODE_ID") = nodeId;
     this->send(message, ileriRotalama["sonraki"]);
+    this->decreaseBattery(0, MSG_TYPE::SENDING, dataPacketSize);
 }
 
 void Node::send(cMessage *msg, int receiver) {
     cModule *node = flatTopologyModule->getSubmodule("nodes", receiver);
     sendDirect(msg, node, "inputGate");
+    this->decreaseBattery(0, MSG_TYPE::SENDING, packetSize);
 }
 
 void Node::setAsNeighbor(int senderIndex) {
@@ -521,5 +548,80 @@ void Node::broadcast(cMessage *msg) {
         sendDirect(msg, node, "inputGate");
         msg = msg->dup();
     }
+
+    this->decreaseBattery(0, MSG_TYPE::BROADCAST, packetSize);
 }
+
+void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
+
+    double decrease = 0;
+
+    if (sendingMsgType == MSG_TYPE::SENDING) {
+
+        if (distance < thDistance)
+            decrease = eElec * payload + payload * eFs * pow(distance, alfa1);
+        else
+            decrease = eElec * payload + payload * eMp * pow(distance, alfa2);
+
+    } else if (sendingMsgType == MSG_TYPE::RECEIVING) {
+
+        decrease = eElec * payload;
+
+    } else if (sendingMsgType == MSG_TYPE::BROADCAST) {
+
+        if (maxDistanceInTopology < thDistance) {
+            decrease = eElec * payload + payload * eFs * pow(maxDistanceInTopology, alfa1);
+        }
+
+        else {
+            decrease = eElec * payload + payload * eMp * pow(maxDistanceInTopology, alfa2);
+        }
+    } /* else if (tip == BIRLESTIRME) {
+        decrease = E_DA * payload;
+    } */
+
+    battery = par("battery").doubleValue();
+    battery = battery - decrease;
+
+    // buna gerek yok gibi.. zaten global olarak "battery" değişkeni var.
+    // node->par("battery").setDoubleValue(battery); // parametre degerini degistir
+
+    // varsayılan - round sonunda belli olacak
+    if (battery > 0.0001) {
+
+        consumedEnergy = consumedEnergy + decrease; // o roundda harcanan enerjiye ekle
+
+        //diziHarcEnerji[indisEnerji] = decrease;
+        //indisEnerji++;
+        // bir düğümün harcadıgı toplam enerji = diziHarcEnerji
+
+
+        // bu aslında burada yoktu
+        // enerji_deger_SN[i][j]=(fullBatarya/diziHarcEnerji[j]);
+        // anlamı = [(toplam pil gucu) / (yapilan isin tukettigi enerji)]
+        // yani full bataryada ne kadar yemis?
+        // total batarya gücünü harcanan güce bölerek,
+        // enerjiye bagli guven hesaplaniyor
+    }
+
+    this->checkBattery();
+}
+
+void Node::checkBattery() {
+
+    if (battery < (initialBattery * 0.05)) {
+        isBatteryFull = false;
+
+        getDisplayString().setTagArg("t", 0, "DIED");
+        getDisplayString().setTagArg("i", 1, "RED");
+
+        char *batteryFinishedIcon = new char[32];
+        sprintf(batteryFinishedIcon, "status/noentry");
+        getDisplayString().setTagArg("i", 0, batteryFinishedIcon); // ikon ata
+        free(batteryFinishedIcon);
+    }
+}
+
+
+
 

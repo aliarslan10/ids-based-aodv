@@ -30,6 +30,17 @@ network FlatTopology
         int maxRss;
         double delayTime;
 
+        int alfa1;
+        int alfa2;
+        double eElec;
+        double eMp;
+        double eFs;
+        double eDa;
+        int thDistance;
+        
+        int packetSize;
+        int dataPacketSize;
+
         @display("bgb=500,200");
 
     submodules:
