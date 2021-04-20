@@ -1,7 +1,21 @@
-.computed/
-.settings/
-out/
-results/
-simulations/results/
-*.exe
+# workspace
+.cmdenv-log
 .metadata
+
+# aliaodv
+aliaodv/.computed/
+aliaodv/.settings/
+aliaodv/out/
+aliaodv/results/
+aliaodv/simulations/results/
+aliaodv/*.exe
+aliaodv/.metadata
+
+# literature
+literature/.computed/
+literature/.settings/
+literature/out/
+literature/results/
+literature/simulations/results/
+literature/*.exe
+literature/.metadata
