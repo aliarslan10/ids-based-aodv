@@ -18,9 +18,10 @@ using namespace std;
 cModule *flatTopologyModule;
 cModule *node;
 
-const int RANDOM_NUMBER_GENERATOR = 2; // omnet.ini seed number
+const int RANDOM_NUMBER_GENERATOR_SEED = 1; // omnet.ini seed number
 
 enum MSG_TYPE{ SENDING, RECEIVING, BROADCAST };
+enum ATTACK_MODE { OFF, ON };
 
 class Node : public cSimpleModule {
     private:
@@ -29,20 +30,19 @@ class Node : public cSimpleModule {
         int kaynak;
         int hedef;
         int nodeSayisi;
-        int radius;
+        int radius, malcsRadius;
         int topolojiX;
         int topolojiY;
         int nodeKordinatX;
         int nodeKordinatY;
         int helloMesajiSayisi = 0;
         int guncelHopSayisi=0, enKucukHop=0, enBuyukHedefSiraNo=0;
-        int minRss, avgRss, maxRss, rss, zararliRss;
-        double delayTime;
         int attackMode;
         int zararliPaketBoyutu;
         int ddosGonderimSayisi;
         int saldiriSayisi = 0;
         const char* zararlilar;
+        bool isHelloSent = false;
 
         vector<int> komsu;
         vector<int> routes;
@@ -56,10 +56,9 @@ class Node : public cSimpleModule {
         vector<int> blackList;
 
         int rreqId = 0;
-        int receivedRreqCount = 0; // en küçük hop seçimi için
+        int receivedRreqCount = 0; // to select smaller hop
         int round = 0;
-        int currentRound = 1;
-        int hedefSeqNo = 1;
+        int hedefSeqNo = 0;
 
         double eElec;
         double eMp;
@@ -70,9 +69,9 @@ class Node : public cSimpleModule {
         int thDistance;
         double maxDistanceInTopology;
 
+        bool isBatteryFull = true;
         double battery;
         double initialBattery;
-        bool isBatteryFull = true;
         double consumedEnergy = 0;
         double totalConsumedEnergy = 0;
 
@@ -86,6 +85,7 @@ class Node : public cSimpleModule {
         virtual void handleHello(cMessage *msg);
         virtual void handleRREQ(AODVRREQ *rreq);
         virtual void handleRREP(AODVRREP *rrep);
+        void sendHello();
         void RREQ();
         void RREP();
         void sendData(const char* msg);
@@ -94,7 +94,7 @@ class Node : public cSimpleModule {
         void start();
         void setAsNeighbor(int senderNodeIndex);
         void alarm(int malcsNodeIndex);
-        void handleAlarm(cMessage *msg);
+        void handleUnicastAlarm(cMessage *msg);
         void broadcastAlarm(int malcsNodeIndex);
         void broadcast(cMessage *msg);
         void newRound();

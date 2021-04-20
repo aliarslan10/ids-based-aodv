@@ -56,3 +56,9 @@ vector<int> Util::checkMaliciousNodes(vector<int> neighbors, vector<int> rreqSen
 
     return neighbors;
 }
+
+
+int Util::randomNumberGenerator(int min, int max) {
+    srand(static_cast <unsigned int> (time(0)));
+    return rand() % max + min;
+}

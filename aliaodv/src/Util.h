@@ -13,6 +13,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <algorithm>
+#include <ctime>
 
 using namespace std;
 
@@ -26,5 +27,6 @@ class Util {
         static bool isMaliciousNode(string m, int nodeIndex);
         static vector<int> checkMaliciousNodes(vector<int> neighbors, vector<int> rreqSenders);
         static string vectorToString(vector<int> neighbors);
+        static int randomNumberGenerator(int min, int max);
 };
 #endif /* SRC_UTIL_H_ */

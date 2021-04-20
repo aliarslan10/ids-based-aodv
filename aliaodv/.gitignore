@@ -1,0 +1,9 @@
+src/AODVMsgPacket_m.cpp
+src/AODVMsgPacket_m.h
+.computed/
+.settings/
+out/
+results/
+simulations/results/
+*.exe
+.metadata
