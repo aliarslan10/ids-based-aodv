@@ -7,7 +7,7 @@
 
 #include "Util.h"
 
- double Util::calculateDistance(int receiverX, int receiverY, int senderX, int senderY) {
+ double Util::calculateTwoNodeDistance(int receiverX, int receiverY, int senderX, int senderY) {
     double x = double(pow(abs(receiverX - senderX), 2));
     double y = double(pow(abs(receiverY - senderY), 2));
     return sqrt(x + y);
@@ -31,4 +31,9 @@ bool Util::isMaliciousNode(string malicious, int nodeIndex) {
     }
 
     return nodeMaliciousStatus;
+}
+
+int Util::randomNumberGenerator(int min, int max) {
+    srand(static_cast <unsigned int> (time(0)));
+    return rand() % max + min;
 }

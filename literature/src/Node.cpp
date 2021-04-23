@@ -19,10 +19,11 @@ void Node::initialize(){
     kaynak = flatTopologyModule->par("kaynak");
     hedef  = flatTopologyModule->par("hedef");
     radius = flatTopologyModule->par("radius");
-    minRss = flatTopologyModule->par("minRss");
-    avgRss = flatTopologyModule->par("avgRss");
-    maxRss = flatTopologyModule->par("maxRss");
-    zararliRss = flatTopologyModule->par("zararliRss");
+    malcsRadius = flatTopologyModule->par("malcsRadius");
+    minRSS = flatTopologyModule->par("minRss");
+    avgRSS = flatTopologyModule->par("avgRss");
+    maxRSS = flatTopologyModule->par("maxRss");
+    malcsRSS = flatTopologyModule->par("malcsRSS");
     delayTime = flatTopologyModule->par("delayTime");
     attackMode = flatTopologyModule->par("attackMode");
     zararlilar = flatTopologyModule->par("zararlilar");
@@ -37,91 +38,96 @@ void Node::initialize(){
     topolojiBoyutuY << flatTopologyModule->getDisplayString().getTagArg("bgb",1);
     topolojiBoyutuY >> topolojiY;
 
-    // 3. parametre omnet.ini dosyasında yer alan seed-no. toplam 6tane var.
-    nodeKordinatX  = intuniform (5,400,RANDOM_NUMBER_GENERATOR);
-    nodeKordinatY  = intuniform (5,150,RANDOM_NUMBER_GENERATOR);
+    // 3. parametre omnet.ini dosyasinda yer alan seed-no. toplam 6tane var.
+    nodeKordinatX  = intuniform (5,topolojiX,RANDOM_NUMBER_GENERATOR_SEED);
+    nodeKordinatY  = intuniform (5,topolojiY,RANDOM_NUMBER_GENERATOR_SEED);
+
     getDisplayString().setTagArg("p", 0, nodeKordinatX);
     getDisplayString().setTagArg("p", 1, nodeKordinatY);
     getDisplayString().setTagArg("r", 0, radius);
 
     EV << "KONUM : " << nodeKordinatX << " - " << nodeKordinatY << endl;
 
-    if(nodeIndex == kaynak)
-        getDisplayString().setTagArg("t", 0, "SOURCE");
-    if(nodeIndex == hedef)
-        getDisplayString().setTagArg("t", 0, "DEST.");
 
-    rss = intuniform(minRss, maxRss);
+    rss = Util::randomNumberGenerator(minRSS, maxRSS);
 
     // get malicious nodes and set them in simulation
-    if (attackMode == 1) {
+    if (attackMode == ATTACK_MODE::ON) {
         if(Util::isMaliciousNode(zararlilar, nodeIndex)) {
             getDisplayString().setTagArg("t", 0, "MALCS.");
             getDisplayString().setTagArg("i", 1, "YELLOW");
-            rss = zararliRss;
+            radius = malcsRadius;
+            rss = malcsRSS;
         }
     }
 
-    start();
+    /**
+     * SET SOURCE NODE
+     */
+    if(nodeIndex == kaynak) {
+        getDisplayString().setTagArg("t", 0, "SOURCE");
+    }
+
+    /**
+     * BASE WILL START TO SIMULATION - ROUND 1
+     */
+    if(nodeIndex == hedef) {
+        getDisplayString().setTagArg("t", 0, "BASE STATION");
+        getDisplayString().setTagArg("i", 0, "device/antennatower");
+        getDisplayString().setTagArg("is",0, "m");
+        this->start();
+    }
 }
 
-void Node::start(){
-    cMessage *baslat = new cMessage("BASLAT");
-    baslat->addPar("POSX");
-    baslat->par("POSX") = nodeKordinatX;
-    baslat->addPar("POSY");
-    baslat->par("POSY") = nodeKordinatY;
-    scheduleAt(simTime()+uniform(0,5), baslat);
+void Node::start() {
+    cMessage *start = new cMessage("START");
+    this->broadcast(start);
 }
 
-void Node::handleMessage(cMessage *msg){
+void Node::newRound() {
+
+    round++;
+
+    if (nodeIndex == kaynak) {
+        rreqId++;
+        hedefSeqNo++;
+    }
+
+    // FOR BASE STATION
+    rreqSenders.clear();
+
+    EV << "ROUND : " << round << endl;
+}
+
+void Node::handleMessage(cMessage *msg) {
 
     if(msg != nullptr){
 
-        if (strcmp(msg->getName(), "BASLAT") == 0){
-
-           EV << "Hello Mesajı İle Komşular Belirleniyor.." << endl;
-
-           cMessage *hello = new cMessage("HELLO");
-           hello->addPar("HELLO_X");
-           hello->par("HELLO_X") = msg->par("POSX").doubleValue();
-           hello->addPar("HELLO_Y");
-           hello->par("HELLO_Y") = msg->par("POSY").doubleValue();
-           hello->addPar("HELLO_INDEX");
-           hello->par("HELLO_INDEX") = nodeIndex;
-           hello->addPar("HELLO_NODE_ID");
-           hello->par("HELLO_NODE_ID") = nodeId;
-           hello->addPar("RSS");
-           hello->par("RSS") = rss;
-           hello->addPar("SENDING_TIME");
-           hello->par("SENDING_TIME") = simTime().dbl();
-           EV << "Gönderdiğim RSS " << rss << endl;
-           cModule *node;
-
-           for (int i = 0; i < nodeSayisi; i++) // sistemdeki dugumlere yollanacak.
-           {
-                node = flatTopologyModule->getSubmodule("nodes", i);
-                sendDirect(hello, node, "inputGate");
-                hello = hello->dup();
-            }
+        if (strcmp(msg->getName(), "START") == 0) {
+            this->newRound();
+            if (nodeIndex == kaynak)
+                round == 1 ? this->sendHello() : this->RREQ();
         }
 
 
-        if (strcmp(msg->getName(), "HELLO") == 0 && nodeIndex != msg->par("HELLO_INDEX").doubleValue()){
+        if (strcmp(msg->getName(), "HELLO") == 0 && this->nodeIndex != msg->par("INDEX").doubleValue()) {
             handleHello(msg);
         }
 
 
         if(strcmp(msg->getName(), "DATA") == 0){
 
-            EV << "VERİ ALINDI" << endl;
+            EV << "VERI ALINDI" << endl;
             EV << "GONDEREN ID   : "<< msg->par("NODE_ID").doubleValue() << endl;
             EV << "GONDEREN INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
 
-            if(nodeIndex != hedef)
+            if(nodeIndex != hedef) {
                 this->sendData("DATA");
-            else
+            } else {
                 EV << "VERİ BAŞARIYLA ALINDI." << endl;
+                EV << "NEW ROUND IS STARTING..." << endl;
+                this->start();
+            }
         }
 
         /* ########## CHECK SUSPICIOUS NODE ########## */
@@ -152,27 +158,44 @@ void Node::handleMessage(cMessage *msg){
              handleRREP(dynamic_cast<AODVRREP*>(msg));
     }
 
+    cout << "msg name : " << msg->getName() << endl;
+
+    delete msg;
+}
+
+
+void Node::sendHello() {
+
+    if (!isHelloSent) {
+        cMessage *hello = new cMessage("HELLO");
+        hello->addPar("ABSCISSA").setDoubleValue(this->nodeKordinatX);
+        hello->addPar("ORDINATE").setDoubleValue(this->nodeKordinatY);
+        hello->addPar("INDEX").setDoubleValue(this->nodeIndex);
+        hello->addPar("RADIUS").setDoubleValue(this->radius);
+        hello->addPar("RSS").setDoubleValue(this->rss);
+        hello->addPar("TIME").setDoubleValue(simTime().dbl());
+
+        this->broadcast(hello);
+
+        isHelloSent = true;
+    }
 }
 
 void Node::handleHello(cMessage *msg){
 
-    int senderIndex = msg->par("HELLO_INDEX");
-    int senderId = msg->par("HELLO_NODE_ID");
-    int gelenX = msg->par("HELLO_X");
-    int gelenY = msg->par("HELLO_Y");
-    int receivedRss = msg->par("RSS");
-    double sendingTime = msg->par("SENDING_TIME");
+    cout << nodeIndex << " - I received hello " << endl;
 
-    EV <<  "HANDLE HELLO - GELEN RSS: " << receivedRss << endl;
+    int senderIndex = msg->par("INDEX");
+    int senderCoordinateX = msg->par("ABSCISSA");
+    int senderCoordinateY = msg->par("ORDINATE");
+    int senderRadius = msg->par("RADIUS");
+    int senderRSS = msg->par("RSS");
+    double sentTime = msg->par("TIME");
 
-    double uzaklik = Util::calculateDistance(nodeKordinatX, nodeKordinatY, gelenX, gelenY);
+    double distance = Util::calculateTwoNodeDistance(nodeKordinatX, nodeKordinatY, senderCoordinateX, senderCoordinateY);
 
-    EV << "Uzaklık : " << uzaklik << endl;
-    EV << " -- NODE::INDEX " << nodeIndex << " -- X::Y " << nodeKordinatX << "-" << nodeKordinatY << endl;
-    EV << " -- SENDER::NODE::INDEX " << senderIndex << " -- X::Y " << gelenX << "-" << gelenY << endl;
-
-    if(uzaklik < radius && senderIndex != nodeIndex){
-        if(!isHelloAttack(receivedRss, senderIndex, sendingTime)) {
+    if(distance < senderRadius && senderIndex != this->nodeIndex) {
+        if(!isHelloAttack(senderRSS, senderIndex, sentTime)) {
             this->setAsNeighbor(senderIndex);
         }
     }
@@ -181,17 +204,15 @@ void Node::handleHello(cMessage *msg){
 
         helloMesajiSayisi++;
 
-        /**
-         * tüm komşulardan alana kadar, kendisi hariç
-         * herkesten hello mesajı aldıysa artık komsuları bellidir.
-         */
         if(helloMesajiSayisi == nodeSayisi-1) {
 
-            EV << "ROTA KEŞFİ BAŞLATILIYOR..." << endl << endl;
-            rreqId  = uniform(0,999); // first assign
-            scheduleStart(simTime()+uniform(500,1000));
-            RREQ();
+            EV << this->nodeIndex << " ::: RREQ STARTED :::" << endl << endl;
+            scheduleStart(simTime()+uniform(500,1000));  // wait and start RREQ
+            this->RREQ();
         }
+    } else {
+        cout << nodeIndex << " - I SHOULD SEND HELLO! " << endl;
+        this->sendHello();
     }
 }
 
@@ -214,18 +235,21 @@ void Node::setAsNeighbor(int senderIndex){
     EV << "--------- END --------" << endl;
 }
 
-bool Node::isHelloAttack(int receivedRss, int senderIndex, double sendingTime) {
+bool Node::isHelloAttack(int senderRSS, int senderIndex, double sentTime) {
+
+    if (attackMode == ATTACK_MODE::OFF) return false;
+
     // malcs.
-    if(receivedRss > maxRss) {
-        EV << "Indexli Düğüm Zararlı" << senderIndex << endl;
+    if(senderRSS > maxRSS) {
+        EV << "MALICIOUS NODE IS DETECTED : " << senderIndex << endl;
         return true;
 
       // suspicious
-    } else if(receivedRss > avgRss) {
+    } else if(senderRSS > avgRSS) {
 
-        EV << ":::: SUPHELI INDEX :::: " << senderIndex << endl;
-        EV << ":::: BENIM INDEX --- SUPHELIYE MSG GONDERIYORUM :::: " << nodeIndex << endl;
-        EV << "SENDING TIME" << sendingTime << endl;
+        EV << ":::: SUSPICIOUS NODE DETECTED :::: " << senderIndex << endl;
+        EV << ":::: I AM SENDING MSG TO SUSPICIOUS :::: " << nodeIndex << endl;
+        EV << "SENDING TIME" << sentTime << endl;
         EV << "CURRENT TIME" << simTime().dbl() << endl;
 
         cMessage *testMsg = new cMessage("TEST_MSG");
@@ -240,7 +264,7 @@ bool Node::isHelloAttack(int receivedRss, int senderIndex, double sendingTime) {
 
 void Node::RREQ(){
 
-    EV << "RREQ Gönderiliyor..." << endl;
+    cout << "RREQ() is triggered. Round : " << round << endl;
 
     AODVRREQ *rreq = new AODVRREQ("RREQ");
     rreq->setKaynakAdr(kaynak);
@@ -253,121 +277,130 @@ void Node::RREQ(){
 
     cModule *node;
 
-    for (int i = 0; i < komsu.size(); i++) // sistemdeki t�m d���mlere yollanacak.
-    {
-       node = flatTopologyModule->getSubmodule("nodes", komsu[i]);
+    for (int i : komsu) {
 
-        EV << "Komşu Index : " <<  komsu[i] << endl;
+        node = flatTopologyModule->getSubmodule("nodes", i);
+
+        EV << "RREQ SENT TO : " <<  i << endl;
 
         sendDirect(rreq, node, "inputGate");
-        rreq = rreq->dup(); // ayni mesaj iki kere gonderilmez duplicate olur.
+        rreq = rreq->dup();
     }
 }
 
 
-void Node::handleRREQ(AODVRREQ *rreq){
+void Node::handleRREQ(AODVRREQ *rreq) {
 
-    //AODVRREQ *rreq = dynamic_cast<AODVRREQ*> (msg);
+    cout << nodeIndex << " - handleRREQ() is called. Round : " << round << endl;
 
     if (rreq != nullptr) {
 
-        EV << "Broadcast Mesaj. Gönderen Index : " << rreq->par("NODE_INDEX").doubleValue() << endl;
+        int senderIndex = (int) rreq->par("NODE_INDEX").doubleValue();
+        string senderNode = to_string(senderIndex);
+        vector<int>::iterator it = std::find(komsu.begin(), komsu.end(), senderIndex);
 
-        guncelHopSayisi = rreq->getHopCount() + 1;
+        EV << " SENDER NODE INDEX " << senderIndex << endl;
+        EV << " I GOT RREQ and I AM " << this->nodeIndex << endl;
 
-        if(nodeIndex == hedef){
+        /**
+         * Eger komsu listemde varsa handle et. Yoksa handle etme.
+         * Hello zararlisinin yaptigi sey de bu aslinda.
+         * Kendini komsu gibi gosterip, kendisine gonderilen paketlerin bosa gitmesi.
+         * tek tarafin komsuya eklemesi durumu
+         */
+        if (it != komsu.end()) {
+
+            guncelHopSayisi = rreq->getHopCount() + 1;
+            rreqSenders.push_back(senderIndex);
+            receivedRreqCount = rreqSenders.size();
+
+            if (nodeIndex == hedef) {
+
+                if (receivedRreqCount <= komsu.size()) {
 
 
-            if(hedefHerKomsudanBirRREPalsin < komsu.size()){
+                    if (enKucukHop > guncelHopSayisi || enKucukHop == 0) {
 
-                hedefHerKomsudanBirRREPalsin++;
+                        enKucukHop = guncelHopSayisi;
 
-                EV << "###### HEDEF NodeE GELEN PAKETLER KARŞILAŞTIRILIYOR! ######" << endl;
+                        geriRotalama["kaynak"]      = rreq->getKaynakAdr();
+                        geriRotalama["hedef"]       = rreq->getHedefAdr();
+                        geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
+                        geriRotalama["hopSayisi"]   = enKucukHop;
+                        geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
+                        geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
 
-                if(enKucukHop > guncelHopSayisi || enKucukHop == 0){
+                    } else if (enBuyukHedefSiraNo < rreq->getHedefSeqNo()) {
 
-                    enKucukHop = guncelHopSayisi;
+                        enBuyukHedefSiraNo = rreq->getHedefSeqNo();
 
-                    geriRotalama["kaynak"]      = rreq->getKaynakAdr();
-                    geriRotalama["hedef"]       = rreq->getHedefAdr();
-                    geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
-                    geriRotalama["hopSayisi"]   = enKucukHop;
-                    geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
-                    geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
+                        geriRotalama["kaynak"]      = rreq->getKaynakAdr();
+                        geriRotalama["hedef"]       = rreq->getHedefAdr();
+                        geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
+                        geriRotalama["hopSayisi"]   = guncelHopSayisi;
+                        geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
+                        geriRotalama["hedefSeqNo"]  = enBuyukHedefSiraNo;
 
-                }else if(enBuyukHedefSiraNo < rreq->getHedefSeqNo()) {
+                    }
 
-                    enBuyukHedefSiraNo = rreq->getHedefSeqNo();
+                    for(int i=0; i<komsu.size(); i++){
+                      EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
+                    }
+
+                    EV << "HEDEF GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
+                    EV << "KAYNAK  INDEX:" << geriRotalama["kaynak"] << endl;
+                    EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
+                    EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
+                    EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
+
+                    EV << "Her komsudan bir RREQ ::: " << receivedRreqCount << endl;
+                    EV << "Hedef Komsu Sayısı ::: " << komsu.size() << endl;
+
+                    if(receivedRreqCount == komsu.size()){ // Node secimi tamamlandiktan sonra burasi calisicak
+
+                        EV << "###### GERİ ROTALAMA TAMAMLANDI! ######" << endl << "-------------------------" << endl;
+                        EV << "İlk RREP Gönderilecek Node Index : " << geriRotalama["sonraki"] << endl;
+
+                        this->RREP(); // hedef ilk RREP mesajini buradan tetikliyor.
+                        //endSimulation();
+                    }
+
+                } else { cout << "rreq and neighbour count mismatch!" << endl; }
+
+            } else {
+
+               if(rreqId != rreq->getRreqId() && nodeIndex != kaynak){
 
                     geriRotalama["kaynak"]      = rreq->getKaynakAdr();
                     geriRotalama["hedef"]       = rreq->getHedefAdr();
                     geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
                     geriRotalama["hopSayisi"]   = guncelHopSayisi;
-                    geriRotalama["sonraki"]     = rreq->par("NODE_INDEX").doubleValue();
-                    geriRotalama["hedefSeqNo"]  = enBuyukHedefSiraNo;
+                    geriRotalama["sonraki"]     = rreq->par("NODE_INDEX");
+                    geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
 
-                }else{}
+                    EV << "ARA NODE GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
+                    EV << "KAYNAK  INDEX:" << geriRotalama["kaynak"] << endl;
+                    EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
+                    EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
+                    EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
 
-                for(int i=0; i<komsu.size(); i++){
+                    EV << "Rota tablosunu oluşturdum. Ben de aynı mesajı broadcast ediyorum..." << endl;
 
-                  EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
-                }
-
-                EV << "HEDEF GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
-                EV << "KAYNAK  INDEX:" << geriRotalama["kaynak"] << endl;
-                EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
-                EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
-                EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
-
-                if(hedefHerKomsudanBirRREPalsin == komsu.size()){ // Node seçimi tamamlandıktan sonra burası çalışacak
-
-                    EV << "###### GERİ ROTALAMA TAMAMLANDI! ######" << endl << "-------------------------" << endl;
-                    EV << "İlk RREP Gönderilecek Nodeün Index Bilgisi : " << geriRotalama["sonraki"] << endl;
-
-                    this->RREP(); // hedef ilk RREP mesajını buradan tetikliyor.
-                    //endSimulation();
-                }
-
-            }else{}
-
-
-        }else{
-
-           if(rreqId != rreq->getRreqId() && nodeIndex != kaynak){
-
-                geriRotalama["kaynak"]      = rreq->getKaynakAdr();
-                geriRotalama["hedef"]       = rreq->getHedefAdr();
-                geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
-                geriRotalama["hopSayisi"]   = guncelHopSayisi;
-                geriRotalama["sonraki"]     = rreq->par("NODE_INDEX");
-                geriRotalama["hedefSeqNo"]  = rreq->getHedefSeqNo();
-
-                EV << "ARA Node GERİ ROTALAMA TABLOSU " << endl << "-------------------------" << endl;
-                EV << "KAYNAK  INDEX:" << geriRotalama["kaynak"] << endl;
-                EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
-                EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
-                EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
-
-                EV << "Rota tablosunu oluşturdum. Ben de aynı mesajı broadcast ediyorum..." << endl;
-
-                rreqId = rreq->getRreqId();
-                this->RREQ();
-
-
-           }else{
-
-               //EV << "Bu broadcast beni ilgilendirmiyor : kaynak Node veya daha önceden alınan bir broadcast" << endl;
-               //EV << "RREQ ID Global : " << rreqId << endl << "Paketle gelen RREQ ID : " << rreq->getRreqId() << endl;
-           }
+                    rreqId = rreq->getRreqId();
+                    this->RREQ();
+               }
+            }
         }
 
-    } else {}
+    } else {
+        EV <<  this->nodeIndex << " :: RREQ bana gonderildi ama benim komsu listemde boyle bir node yok veya zararli. " << endl;
+    }
 }
 
 
 void Node::RREP(){
 
-    EV << "RREP Gönderiliyor..." << endl;
+    EV << "RREP Gonderiliyor..." << endl;
 
     AODVRREP *rrep = new AODVRREP("RREP");
     rrep->setKaynakAdr(hedef);
@@ -424,4 +457,14 @@ void Node::sendData(const char* msg){
 void Node::send(cMessage *msg, int receiver) {
     cModule *node = flatTopologyModule->getSubmodule("nodes", receiver);
     sendDirect(msg, node, "inputGate");
+}
+
+void Node::broadcast(cMessage *msg) {
+    for (int i = 0; i < nodeSayisi; i++) {
+        cModule *node = flatTopologyModule->getSubmodule("nodes", i);
+        sendDirect(msg, node, "inputGate");
+        msg = msg->dup();
+    }
+
+    //this->decreaseBattery(0, MSG_TYPE::BROADCAST, packetSize);
 }

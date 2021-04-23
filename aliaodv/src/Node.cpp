@@ -130,7 +130,7 @@ void Node::handleMessage(cMessage *msg) {
         if (strcmp(msg->getName(), "START") == 0) {
             this->newRound();
             if (nodeIndex == kaynak)
-                round > 1 ? this->RREQ() : this->sendHello();
+                round == 1 ? this->sendHello() : this->RREQ();
         }
 
         if (strcmp(msg->getName(), "HELLO") == 0 && this->nodeIndex != msg->par("NODE_INDEX").doubleValue()) {
@@ -156,8 +156,7 @@ void Node::handleMessage(cMessage *msg) {
 
             if(nodeIndex != hedef) {
                 this->sendData("DATA");
-            }
-            else {
+            } else {
                 EV << "VERİ BAŞARIYLA ALINDI." << endl;
                 EV << "NEW ROUND IS STARTING..." << endl;
                 this->start();
@@ -363,7 +362,6 @@ void Node::handleRREQ(AODVRREQ *rreq) {
                     EV << "HEDEF   INDEX:" << geriRotalama["hedef"] << endl;
                     EV << "SONRAKI INDEX:" << geriRotalama["sonraki"] << endl;
                     EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
-
 
                     EV << "Her komsudan bir RREQ ::: " << receivedRreqCount << endl;
                     EV << "Hedef Komsu Sayısı ::: " << komsu.size() << endl;

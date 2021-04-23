@@ -23,14 +23,15 @@ network FlatTopology
         int kaynak;
         int hedef;
         int radius;
+        int malcsRadius;
+        int malcsRSS;
         int attackMode;
         int minRss;
         int avgRss;
-        int zararliRss;
         int maxRss;
         double delayTime;
 
-        @display("bgb=500,200");
+        @display("bgb=200,200");
 
     submodules:
         nodes[nodeSayisi]: Node {
