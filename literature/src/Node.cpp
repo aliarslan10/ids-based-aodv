@@ -14,6 +14,10 @@ Define_Module(Node);
 
 void Node::initialize(){
 
+    node = getModuleByPath(this->getFullPath().c_str());
+    nodeId = this->getId();
+    nodeIndex  = this->getIndex();
+
     flatTopologyModule = getModuleByPath("FlatTopology");
     nodeSayisi = flatTopologyModule->par("nodeSayisi");
     kaynak = flatTopologyModule->par("kaynak");
@@ -27,28 +31,29 @@ void Node::initialize(){
     delayTime = flatTopologyModule->par("delayTime");
     attackMode = flatTopologyModule->par("attackMode");
     zararlilar = flatTopologyModule->par("zararlilar");
-    nodeId = this->getId();
-    nodeIndex  = this->getIndex();
+    packetSize = flatTopologyModule->par("packetSize");
+    dataPacketSize = flatTopologyModule->par("dataPacketSize");
+    initialBattery = node->par("battery").doubleValue();
+    battery = initialBattery;
 
     stringstream topolojiBoyutuX;
     topolojiBoyutuX << flatTopologyModule->getDisplayString().getTagArg("bgb",0);
-    topolojiBoyutuX >> topolojiX; // string değer, integer olan değere atandı.
+    topolojiBoyutuX >> topolojiX;
 
     stringstream topolojiBoyutuY;
     topolojiBoyutuY << flatTopologyModule->getDisplayString().getTagArg("bgb",1);
     topolojiBoyutuY >> topolojiY;
 
-    // 3. parametre omnet.ini dosyasinda yer alan seed-no. toplam 6tane var.
-    nodeKordinatX  = intuniform (5,topolojiX,RANDOM_NUMBER_GENERATOR_SEED);
-    nodeKordinatY  = intuniform (5,topolojiY,RANDOM_NUMBER_GENERATOR_SEED);
+    maxDistanceInTopology = Util::calculateDiagonalDistance(topolojiX, topolojiY);
 
+    // 3. parametre omnet.ini dosyasında yer alan seed-no. toplam 6tane var.
+    nodeKordinatX  = intuniform (10,topolojiX,RANDOM_NUMBER_GENERATOR_SEED);
+    nodeKordinatY  = intuniform (10,topolojiY,RANDOM_NUMBER_GENERATOR_SEED);
     getDisplayString().setTagArg("p", 0, nodeKordinatX);
     getDisplayString().setTagArg("p", 1, nodeKordinatY);
-    getDisplayString().setTagArg("r", 0, radius);
-
-    EV << "KONUM : " << nodeKordinatX << " - " << nodeKordinatY << endl;
 
 
+    // will cause suspicious node activity
     rss = Util::randomNumberGenerator(minRSS, maxRSS);
 
     // get malicious nodes and set them in simulation
@@ -61,9 +66,23 @@ void Node::initialize(){
         }
     }
 
-    /**
-     * SET SOURCE NODE
+    getDisplayString().setTagArg("r", 0, radius);
+
+    /*
+     * GET LEACH ENERGY MODEL PARAMETERS
      */
+    eElec = flatTopologyModule->par("eElec").doubleValue();
+    eMp = flatTopologyModule->par("eMp").doubleValue();
+    eFs = flatTopologyModule->par("eFs").doubleValue();
+    eDa = flatTopologyModule->par("eDa").doubleValue();
+    alfa1 = flatTopologyModule->par("alfa1");
+    alfa2 = flatTopologyModule->par("alfa2");
+    thDistance = flatTopologyModule->par("thDistance");
+
+    /**
+     * SET RANDOM SOURCE NODE
+     */
+    //kaynak = Util::randomNumberGenerator(0, nodeSayisi);
     if(nodeIndex == kaynak) {
         getDisplayString().setTagArg("t", 0, "SOURCE");
     }
@@ -101,7 +120,9 @@ void Node::newRound() {
 
 void Node::handleMessage(cMessage *msg) {
 
-    if(msg != nullptr){
+    if(msg != nullptr && isBatteryFull) {
+
+        this->decreaseBattery(0, MSG_TYPE::RECEIVING, packetSize);
 
         if (strcmp(msg->getName(), "START") == 0) {
             this->newRound();
@@ -286,6 +307,8 @@ void Node::RREQ(){
         sendDirect(rreq, node, "inputGate");
         rreq = rreq->dup();
     }
+
+    this->decreaseBattery(0, MSG_TYPE::BROADCAST, packetSize);
 }
 
 
@@ -411,6 +434,7 @@ void Node::RREP(){
     rrep->par("NODE_INDEX") = nodeIndex;
 
     this->send(rrep, geriRotalama["sonraki"]);
+    this->decreaseBattery(0, MSG_TYPE::SENDING, packetSize);
 }
 
 void Node::handleRREP(AODVRREP *rrep){
@@ -457,6 +481,7 @@ void Node::sendData(const char* msg){
 void Node::send(cMessage *msg, int receiver) {
     cModule *node = flatTopologyModule->getSubmodule("nodes", receiver);
     sendDirect(msg, node, "inputGate");
+    this->decreaseBattery(0, MSG_TYPE::SENDING, packetSize);
 }
 
 void Node::broadcast(cMessage *msg) {
@@ -466,5 +491,74 @@ void Node::broadcast(cMessage *msg) {
         msg = msg->dup();
     }
 
-    //this->decreaseBattery(0, MSG_TYPE::BROADCAST, packetSize);
+    this->decreaseBattery(0, MSG_TYPE::BROADCAST, packetSize);
+}
+
+void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
+
+    if (sendingMsgType == MSG_TYPE::SENDING) {
+
+        if (distance < thDistance)
+            consumedEnergy = eElec * payload + payload * eFs * pow(distance, alfa1);
+        else
+            consumedEnergy = eElec * payload + payload * eMp * pow(distance, alfa2);
+
+    } else if (sendingMsgType == MSG_TYPE::RECEIVING) {
+
+        consumedEnergy = eElec * payload;
+
+    } else if (sendingMsgType == MSG_TYPE::BROADCAST) {
+
+        if (maxDistanceInTopology < thDistance) {
+            consumedEnergy = eElec * payload + payload * eFs * pow(maxDistanceInTopology, alfa1);
+        }
+
+        else {
+            consumedEnergy = eElec * payload + payload * eMp * pow(maxDistanceInTopology, alfa2);
+        }
+    } /* else if (tip == BIRLESTIRME) {
+        consumedEnergy = E_DA * payload;
+    } */
+
+    battery = battery - consumedEnergy;
+
+    cout << "---------------------------" << endl;
+    cout << "MESSAGE TYPE : " << sendingMsgType << " FROM NODE " << this->nodeIndex << endl;
+    cout << "DECREASED : " << consumedEnergy << endl;
+    cout << "TOTAL BATTERY : " << initialBattery << endl;
+    cout << "REMANING BATTERY : " << battery << endl;
+    cout << "---------------------------" << endl;
+
+    // buna gerek yok gibi.. zaten global olarak "battery" değişkeni var.
+    // node->par("battery").setDoubleValue(battery); // parametre degerini degistir
+
+    // varsayılan - round sonunda belli olacak
+    if (battery > 0.0001) {
+
+        totalConsumedEnergy += consumedEnergy; // o roundda harcanan enerjiye ekle
+        cout << "TOTAL CONSUMED : " << totalConsumedEnergy << endl << "--------------" << endl;
+
+        //diziHarcEnerji[indisEnerji] = consumedEnergy;
+        //indisEnerji++;
+        // bir düğümün harcadıgı toplam enerji = diziHarcEnerji
+
+
+        // bu aslında burada yoktu
+        // enerji_deger_SN[i][j]=(fullBatarya/diziHarcEnerji[j]);
+        // anlamı = [(toplam pil gucu) / (yapilan isin tukettigi enerji)]
+        // yani full bataryada ne kadar yemis?
+        // total batarya gücünü harcanan güce bölerek,
+        // enerjiye bagli guven hesaplaniyor
+    }
+
+    this->checkBattery();
+}
+
+void Node::checkBattery() {
+
+    if (battery < (initialBattery * 0.05) && this->nodeIndex != hedef) {
+        isBatteryFull = false;
+        getDisplayString().parse("i=block/circle,black;is=vs;t=DIED");
+        EV << "Battery Finished : " << this->nodeIndex << endl;
+    }
 }

@@ -17,10 +17,13 @@ using namespace omnetpp;
 using namespace std;
 
 cModule *flatTopologyModule;
+cModule *node;
 
+enum MSG_TYPE{ SENDING, RECEIVING, BROADCAST };
 enum ATTACK_MODE { OFF, ON };
 
 const int RANDOM_NUMBER_GENERATOR_SEED = 1; // omnet.ini seed number
+
 
 class Node : public cSimpleModule {
     private:
@@ -55,6 +58,24 @@ class Node : public cSimpleModule {
         int round = 0;
         int hedefSeqNo = 0;
 
+        double eElec;
+        double eMp;
+        double eFs;
+        double eDa;
+        int alfa1;
+        int alfa2;
+        int thDistance;
+        double maxDistanceInTopology;
+
+        bool isBatteryFull = true;
+        double battery;
+        double initialBattery;
+        double consumedEnergy = 0;
+        double totalConsumedEnergy = 0;
+
+        int packetSize;
+        int dataPacketSize;
+
     protected:
         virtual void initialize();
         virtual void handleMessage(cMessage *msg);
@@ -72,6 +93,8 @@ class Node : public cSimpleModule {
         void setAsNeighbor(int senderNodeIndex);
         void broadcast(cMessage *msg);
         void newRound();
+        void decreaseBattery(double distance, int msgSendingType, int payload);
+        void checkBattery();
 };
 
 #endif /* NODE_H_ */

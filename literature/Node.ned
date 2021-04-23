@@ -22,6 +22,7 @@ simple Node
         bool askGratuitousRREP = default(false); //RFC 3561: 6.6.3 (gereksiz RREP hedef düğüme giden yolda bir sonraki atlamaya gönderilir, sanki hedef düğüm kaynak düğüm için bir RREQ yayınlamış gibi ve bu RREP,  (hayali) RREQ'ye yanıt olarak üretilmiştir.)
         bool useHelloMessages = default(false); // RFC 3561: 6.9
         bool useLocalRepair = default(false); //   RFC 3561: 6.12 (ihtiyac duyularsa yapilacak)
+        double battery;
 
  	    //jitter : sapma, gecikme. örneğin broadcast ve rrep için uygulanabilir.
 

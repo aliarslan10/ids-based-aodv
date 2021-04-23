@@ -7,13 +7,13 @@
 
 #include "Util.h"
 
- double Util::calculateTwoNodeDistance(int receiverX, int receiverY, int senderX, int senderY) {
+double Util::calculateTwoNodeDistance(int receiverX, int receiverY, int senderX, int senderY) {
     double x = double(pow(abs(receiverX - senderX), 2));
     double y = double(pow(abs(receiverY - senderY), 2));
     return sqrt(x + y);
 }
 
- double Util::calculateDiagonalDistance(int xSideLength, int ySideLength) {
+double Util::calculateDiagonalDistance(int xSideLength, int ySideLength) {
      return sqrt(double(pow((xSideLength), 2) + pow((ySideLength), 2)));
  }
 
