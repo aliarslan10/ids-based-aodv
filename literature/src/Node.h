@@ -40,6 +40,7 @@ class Node : public cSimpleModule {
         int rss, minRSS, avgRSS, maxRSS, malcsRSS;
         int helloMesajiSayisi = 0;
         int guncelHopSayisi=0, enKucukHop=0, enBuyukHedefSiraNo=0;
+        double delaySuspicious;
         double delayTime;
         int attackMode;
         int zararliPaketBoyutu;
@@ -72,6 +73,7 @@ class Node : public cSimpleModule {
         double initialBattery;
         double consumedEnergy = 0;
         double totalConsumedEnergy = 0;
+        bool isWaitingForTestMsgResponse = false;
 
         int packetSize;
         int dataPacketSize;

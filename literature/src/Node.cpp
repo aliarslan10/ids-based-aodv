@@ -54,7 +54,8 @@ void Node::initialize(){
 
 
     // will cause suspicious node activity
-    rss = Util::randomNumberGenerator(minRSS, maxRSS);
+    rss = intuniform(minRSS, maxRSS);
+    EV << "RSS VALUE : " << rss << endl;
 
     // get malicious nodes and set them in simulation
     if (attackMode == ATTACK_MODE::ON) {
@@ -63,6 +64,11 @@ void Node::initialize(){
             getDisplayString().setTagArg("i", 1, "YELLOW");
             radius = malcsRadius;
             rss = malcsRSS;
+        } else if(rss > avgRSS) {
+            getDisplayString().setTagArg("t", 0, "SUSPICIOUS");
+            int randomNumberGeneratorSeed = 4;
+            delaySuspicious = 0.4;
+            EV << "SUSPCS DELAY : " << delaySuspicious << endl;
         }
     }
 
@@ -130,7 +136,6 @@ void Node::handleMessage(cMessage *msg) {
                 round == 1 ? this->sendHello() : this->RREQ();
         }
 
-
         if (strcmp(msg->getName(), "HELLO") == 0 && this->nodeIndex != msg->par("INDEX").doubleValue()) {
             handleHello(msg);
         }
@@ -155,10 +160,9 @@ void Node::handleMessage(cMessage *msg) {
         if(strcmp(msg->getName(), "TEST_MSG") == 0){
             cMessage *testMsgResp = new cMessage("TEST_MSG_RESP");
             int msgSenderIndex =  msg->par("TEST_MSG_SENDER_INDEX");
-            testMsgResp->addPar("DELAY");
-            testMsgResp->par("DELAY") = uniform(0, 1);
-            testMsgResp->addPar("TEST_RESP_MSG_SENDER_INDEX");
-            testMsgResp->par("TEST_RESP_MSG_SENDER_INDEX") = nodeIndex;
+            testMsgResp->addPar("DELAY").setDoubleValue(delaySuspicious);
+            testMsgResp->addPar("TEST_RESP_MSG_SENDER_INDEX").setBoolValue(nodeIndex);
+            (delaySuspicious > delayTime) ? getDisplayString().setTagArg("t", 0, "MALCS.") : getDisplayString().removeTag("t");
             this->send(testMsgResp, msgSenderIndex);
         }
 
@@ -166,13 +170,17 @@ void Node::handleMessage(cMessage *msg) {
             double delay =  msg->par("DELAY").doubleValue();
             double sender = msg->par("TEST_RESP_MSG_SENDER_INDEX");
             EV << "DELAY : " << delay << " //// SENDER : " << sender << endl;
-            if (delay < delayTime) {
-                this->setAsNeighbor(sender);
+            if (delay < delayTime) this->setAsNeighbor(sender);
+            if (isWaitingForTestMsgResponse && nodeIndex == kaynak) {
+                cout << "start new rreq from here" << endl;
+                EV << "start new rreq from here" << endl;
+                isWaitingForTestMsgResponse = false;
+                this->RREQ();
             }
         }
         /* ########## END - CHECK SUSPICIOUS NODE ########## */
 
-         if(AODVMesajPaketiTipi::RREQ)
+         if(AODVMesajPaketiTipi::RREQ && strcmp(msg->getName(), "RREQ") == 0)
              handleRREQ(dynamic_cast<AODVRREQ*>(msg)); // alternatif : check_and_cast<AODVRREQ*>(msg)
 
          if(AODVMesajPaketiTipi::RREP)
@@ -225,7 +233,7 @@ void Node::handleHello(cMessage *msg){
 
         helloMesajiSayisi++;
 
-        if(helloMesajiSayisi == nodeSayisi-1) {
+        if (helloMesajiSayisi == nodeSayisi-1 && !isWaitingForTestMsgResponse) {
 
             EV << this->nodeIndex << " ::: RREQ STARTED :::" << endl << endl;
             scheduleStart(simTime()+uniform(500,1000));  // wait and start RREQ
@@ -277,7 +285,11 @@ bool Node::isHelloAttack(int senderRSS, int senderIndex, double sentTime) {
         testMsg->addPar("TEST_MSG_SENDER_INDEX");
         testMsg->par("TEST_MSG_SENDER_INDEX") = nodeIndex;
 
+        if (nodeIndex == kaynak) isWaitingForTestMsgResponse = true;
+
         this->send(testMsg, senderIndex);
+
+        return true;
     }
 
     return false;
