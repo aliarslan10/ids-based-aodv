@@ -28,22 +28,18 @@ void Node::initialize(){
     zararlilar = flatTopologyModule->par("zararlilar");
     packetSize = flatTopologyModule->par("packetSize");
     dataPacketSize = flatTopologyModule->par("dataPacketSize");
+    selectedSeed = flatTopologyModule->par("selectedSeed");
     initialBattery = node->par("battery").doubleValue();
     battery = initialBattery;
 
-    stringstream topolojiBoyutuX;
-    topolojiBoyutuX << flatTopologyModule->getDisplayString().getTagArg("bgb",0);
-    topolojiBoyutuX >> topolojiX;
-
-    stringstream topolojiBoyutuY;
-    topolojiBoyutuY << flatTopologyModule->getDisplayString().getTagArg("bgb",1);
-    topolojiBoyutuY >> topolojiY;
+    topolojiX = flatTopologyModule->par("constraintAreaX");
+    topolojiY = flatTopologyModule->par("constraintAreaY");
 
     maxDistanceInTopology = Util::calculateDiagonalDistance(topolojiX, topolojiY);
 
     // 3. parametre omnet.ini dosyasında yer alan seed-no. toplam 6tane var.
-    nodeKordinatX  = intuniform (10,topolojiX,RANDOM_NUMBER_GENERATOR_SEED);
-    nodeKordinatY  = intuniform (10,topolojiY,RANDOM_NUMBER_GENERATOR_SEED);
+    nodeKordinatX  = intuniform (5, topolojiX, selectedSeed);
+    nodeKordinatY  = intuniform (5, topolojiY, selectedSeed);
     getDisplayString().setTagArg("p", 0, nodeKordinatX);
     getDisplayString().setTagArg("p", 1, nodeKordinatY);
 
@@ -236,7 +232,8 @@ void Node::newRound() {
     // FOR BASE STATION
     rreqSenders.clear();
 
-    EV << "ROUND : " << round << endl;
+    EV << "::::::::::: ROUND " << round << " IS STARTING :::::::::::" << endl;
+    EV << "TOTAL CONSUMED : " << totalConsumedEnergy << endl;
 }
 
 
@@ -255,6 +252,7 @@ void Node::RREQ() {
 
     cModule *node;
 
+    // more like unicast
     for (int i : komsu)
     {
        node = flatTopologyModule->getSubmodule("nodes", i);
@@ -432,7 +430,6 @@ void Node::RREP() {
     rrep->addPar("NODE_INDEX").setDoubleValue(nodeIndex);
 
     this->send(rrep, geriRotalama["sonraki"]);
-    this->decreaseBattery(0, MSG_TYPE::SENDING, packetSize);
 }
 
 void Node::handleRREP(AODVRREP *rrep) {
@@ -496,7 +493,7 @@ void Node::sendData(const char* msg) {
 void Node::send(cMessage *msg, int receiver) {
     cModule *node = flatTopologyModule->getSubmodule("nodes", receiver);
     sendDirect(msg, node, "inputGate");
-    this->decreaseBattery(0, MSG_TYPE::SENDING, packetSize);
+    this->decreaseBattery(radius, MSG_TYPE::SENDING, packetSize); // default dist.: radius
 }
 
 void Node::setAsNeighbor(int senderIndex) {

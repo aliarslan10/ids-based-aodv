@@ -18,8 +18,6 @@ using namespace std;
 cModule *flatTopologyModule;
 cModule *node;
 
-const int RANDOM_NUMBER_GENERATOR_SEED = 1; // omnet.ini seed number
-
 enum MSG_TYPE{ SENDING, RECEIVING, BROADCAST };
 enum ATTACK_MODE { OFF, ON };
 
@@ -77,7 +75,7 @@ class Node : public cSimpleModule {
 
         int packetSize;
         int dataPacketSize;
-
+        int selectedSeed;
 
     protected:
         virtual void initialize();

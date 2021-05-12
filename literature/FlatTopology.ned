@@ -41,9 +41,12 @@ network FlatTopology
         
         int packetSize;
         int dataPacketSize;
-        
 
-        @display("bgb=200,200");
+        int selectedSeed;
+        int constraintAreaX;
+        int constraintAreaY;
+        
+        @display("bgb=$constraintAreaX,$constraintAreaY");
 
     submodules:
         nodes[nodeSayisi]: Node {

@@ -33,22 +33,18 @@ void Node::initialize(){
     zararlilar = flatTopologyModule->par("zararlilar");
     packetSize = flatTopologyModule->par("packetSize");
     dataPacketSize = flatTopologyModule->par("dataPacketSize");
+    selectedSeed = flatTopologyModule->par("selectedSeed");
     initialBattery = node->par("battery").doubleValue();
     battery = initialBattery;
 
-    stringstream topolojiBoyutuX;
-    topolojiBoyutuX << flatTopologyModule->getDisplayString().getTagArg("bgb",0);
-    topolojiBoyutuX >> topolojiX;
-
-    stringstream topolojiBoyutuY;
-    topolojiBoyutuY << flatTopologyModule->getDisplayString().getTagArg("bgb",1);
-    topolojiBoyutuY >> topolojiY;
+    topolojiX = flatTopologyModule->par("constraintAreaX");
+    topolojiY = flatTopologyModule->par("constraintAreaY");
 
     maxDistanceInTopology = Util::calculateDiagonalDistance(topolojiX, topolojiY);
 
     // 3. parametre omnet.ini dosyasında yer alan seed-no. toplam 6tane var.
-    nodeKordinatX  = intuniform (10,topolojiX,RANDOM_NUMBER_GENERATOR_SEED);
-    nodeKordinatY  = intuniform (10,topolojiY,RANDOM_NUMBER_GENERATOR_SEED);
+    nodeKordinatX  = intuniform (5, topolojiX, selectedSeed);
+    nodeKordinatY  = intuniform (5, topolojiY, selectedSeed);
     getDisplayString().setTagArg("p", 0, nodeKordinatX);
     getDisplayString().setTagArg("p", 1, nodeKordinatY);
 
@@ -90,6 +86,7 @@ void Node::initialize(){
      */
     //kaynak = Util::randomNumberGenerator(0, nodeSayisi);
     if(nodeIndex == kaynak) {
+        rss = avgRSS; // source shouldn't be malcs or suspcs.
         getDisplayString().setTagArg("t", 0, "SOURCE");
     }
 
@@ -97,6 +94,7 @@ void Node::initialize(){
      * BASE WILL START TO SIMULATION - ROUND 1
      */
     if(nodeIndex == hedef) {
+        rss = avgRSS; // destination shouldn't be malcs or suspcs.
         getDisplayString().setTagArg("t", 0, "BASE STATION");
         getDisplayString().setTagArg("i", 0, "device/antennatower");
         getDisplayString().setTagArg("is",0, "m");
@@ -122,6 +120,7 @@ void Node::newRound() {
     rreqSenders.clear();
 
     EV << "ROUND : " << round << endl;
+    EV << "TOTAL CONSUMED : " << totalConsumedEnergy << endl;
 }
 
 void Node::handleMessage(cMessage *msg) {
@@ -160,15 +159,17 @@ void Node::handleMessage(cMessage *msg) {
         if(strcmp(msg->getName(), "TEST_MSG") == 0){
             cMessage *testMsgResp = new cMessage("TEST_MSG_RESP");
             int msgSenderIndex =  msg->par("TEST_MSG_SENDER_INDEX");
+            EV <<  "I GOT TEST_MSG FROM " << msgSenderIndex << endl;
             testMsgResp->addPar("DELAY").setDoubleValue(delaySuspicious);
-            testMsgResp->addPar("TEST_RESP_MSG_SENDER_INDEX").setBoolValue(nodeIndex);
+            testMsgResp->addPar("TEST_RESP_MSG_SENDER_INDEX").setDoubleValue(nodeIndex);
             (delaySuspicious > delayTime) ? getDisplayString().setTagArg("t", 0, "MALCS.") : getDisplayString().removeTag("t");
             this->send(testMsgResp, msgSenderIndex);
         }
 
         if(strcmp(msg->getName(), "TEST_MSG_RESP") == 0){
             double delay =  msg->par("DELAY").doubleValue();
-            double sender = msg->par("TEST_RESP_MSG_SENDER_INDEX");
+            int sender = msg->par("TEST_RESP_MSG_SENDER_INDEX");
+            EV <<  "I GOT TEST_MSG_RESP FROM " << sender << endl;
             EV << "DELAY : " << delay << " //// SENDER : " << sender << endl;
             if (delay < delayTime) this->setAsNeighbor(sender);
             if (isWaitingForTestMsgResponse && nodeIndex == kaynak) {
@@ -223,6 +224,10 @@ void Node::handleHello(cMessage *msg){
 
     double distance = Util::calculateTwoNodeDistance(nodeKordinatX, nodeKordinatY, senderCoordinateX, senderCoordinateY);
 
+    EV << "SENDER NODE ::: " << senderIndex << endl;
+    EV << "DISTANCE :::::: " << distance << endl;
+    EV << "SENDER RADIUS : " << senderRadius << endl;
+
     if(distance < senderRadius && senderIndex != this->nodeIndex) {
         if(!isHelloAttack(senderRSS, senderIndex, sentTime)) {
             this->setAsNeighbor(senderIndex);
@@ -247,8 +252,8 @@ void Node::handleHello(cMessage *msg){
 
 void Node::setAsNeighbor(int senderIndex){
     bool isThere = false;
-    for(int i=1; i<komsu.size(); i++){
-        if(komsu[i] == senderIndex){
+    for(int nodeIndex : komsu){
+        if(nodeIndex == senderIndex){
             isThere = true;
         }
     }
@@ -257,9 +262,10 @@ void Node::setAsNeighbor(int senderIndex){
         komsu.push_back(senderIndex);
     }
 
+    EV << "::::::::: LAST SENDER ::::::::" << senderIndex << endl;
     EV << "--------- NEIGH. LIST --------" << endl;
-    for(int i=1; i<komsu.size(); i++){
-        EV << "Node INDEX komsu[i] = " <<  komsu[i] << endl;
+    for(int nodeIndex : komsu){
+        EV << "NEIGHBOUR INDEX = " <<  nodeIndex << endl;
     }
     EV << "--------- END --------" << endl;
 }
@@ -276,14 +282,14 @@ bool Node::isHelloAttack(int senderRSS, int senderIndex, double sentTime) {
       // suspicious
     } else if(senderRSS > avgRSS) {
 
+        EV << "senderRSS BIGGER THAN avgRSS " << senderRSS << " < " << avgRSS << endl;
         EV << ":::: SUSPICIOUS NODE DETECTED :::: " << senderIndex << endl;
-        EV << ":::: I AM SENDING MSG TO SUSPICIOUS :::: " << nodeIndex << endl;
+        EV << ":::: I AM SENDING MSG TO SUSPICIOUS :::: " << senderIndex << endl;
         EV << "SENDING TIME" << sentTime << endl;
         EV << "CURRENT TIME" << simTime().dbl() << endl;
 
         cMessage *testMsg = new cMessage("TEST_MSG");
-        testMsg->addPar("TEST_MSG_SENDER_INDEX");
-        testMsg->par("TEST_MSG_SENDER_INDEX") = nodeIndex;
+        testMsg->addPar("TEST_MSG_SENDER_INDEX").setDoubleValue(nodeIndex);
 
         if (nodeIndex == kaynak) isWaitingForTestMsgResponse = true;
 
@@ -493,7 +499,7 @@ void Node::sendData(const char* msg){
 void Node::send(cMessage *msg, int receiver) {
     cModule *node = flatTopologyModule->getSubmodule("nodes", receiver);
     sendDirect(msg, node, "inputGate");
-    this->decreaseBattery(0, MSG_TYPE::SENDING, packetSize);
+    this->decreaseBattery(radius, MSG_TYPE::SENDING, packetSize); // default dist.: radius
 }
 
 void Node::broadcast(cMessage *msg) {

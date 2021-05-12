@@ -22,9 +22,6 @@ cModule *node;
 enum MSG_TYPE{ SENDING, RECEIVING, BROADCAST };
 enum ATTACK_MODE { OFF, ON };
 
-const int RANDOM_NUMBER_GENERATOR_SEED = 1; // omnet.ini seed number
-
-
 class Node : public cSimpleModule {
     private:
         int nodeId;
@@ -77,6 +74,7 @@ class Node : public cSimpleModule {
 
         int packetSize;
         int dataPacketSize;
+        int selectedSeed;
 
     protected:
         virtual void initialize();
