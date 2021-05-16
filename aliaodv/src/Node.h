@@ -76,6 +76,7 @@ class Node : public cSimpleModule {
         int packetSize;
         int dataPacketSize;
         int selectedSeed;
+        double totalConsumedBatteryStats = 0;
 
     protected:
         virtual void initialize();
@@ -98,6 +99,7 @@ class Node : public cSimpleModule {
         void newRound();
         void decreaseBattery(double distance, int msgSendingType, int payload);
         void checkBattery();
+        void sendStatsToBaseStation();
 };
 
 #endif /* NODE_H_ */

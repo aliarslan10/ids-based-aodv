@@ -118,9 +118,9 @@ void Node::newRound() {
 
     // FOR BASE STATION
     rreqSenders.clear();
+    sendStatsToBaseStation();
 
-    EV << "ROUND : " << round << endl;
-    EV << "TOTAL CONSUMED : " << totalConsumedEnergy << endl;
+    EV << "::::::::::: ROUND " << round << " IS STARTING :::::::::::" << endl;
 }
 
 void Node::handleMessage(cMessage *msg) {
@@ -142,14 +142,14 @@ void Node::handleMessage(cMessage *msg) {
 
         if(strcmp(msg->getName(), "DATA") == 0){
 
-            EV << "VERI ALINDI" << endl;
-            EV << "GONDEREN ID   : "<< msg->par("NODE_ID").doubleValue() << endl;
-            EV << "GONDEREN INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
+            EV << "DATA RECEIVED" << endl;
+            EV << "SENDER ID   : "<< msg->par("NODE_ID").doubleValue() << endl;
+            EV << "SENDER INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
 
             if(nodeIndex != hedef) {
                 this->sendData("DATA");
             } else {
-                EV << "VERİ BAŞARIYLA ALINDI." << endl;
+                EV << "DATA RECEIVED BY BASE STATION." << endl;
                 EV << "NEW ROUND IS STARTING..." << endl;
                 this->start();
             }
@@ -180,6 +180,11 @@ void Node::handleMessage(cMessage *msg) {
             }
         }
         /* ########## END - CHECK SUSPICIOUS NODE ########## */
+
+        if(strcmp(msg->getName(), "STATS") == 0 && nodeIndex == hedef) {
+            totalConsumedBatteryStats += msg->par("CONSUMED_BATTERY").doubleValue();;
+            EV << "ROUND : " << round << " CONSUMED ENERGY STAT : " << totalConsumedBatteryStats << endl;
+        }
 
          if(AODVMesajPaketiTipi::RREQ && strcmp(msg->getName(), "RREQ") == 0)
              handleRREQ(dynamic_cast<AODVRREQ*>(msg)); // alternatif : check_and_cast<AODVRREQ*>(msg)
@@ -540,13 +545,6 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
 
     battery = battery - consumedEnergy;
 
-    cout << "---------------------------" << endl;
-    cout << "MESSAGE TYPE : " << sendingMsgType << " FROM NODE " << this->nodeIndex << endl;
-    cout << "DECREASED : " << consumedEnergy << endl;
-    cout << "TOTAL BATTERY : " << initialBattery << endl;
-    cout << "REMANING BATTERY : " << battery << endl;
-    cout << "---------------------------" << endl;
-
     // buna gerek yok gibi.. zaten global olarak "battery" değişkeni var.
     // node->par("battery").setDoubleValue(battery); // parametre degerini degistir
 
@@ -554,7 +552,16 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
     if (battery > 0.0001) {
 
         totalConsumedEnergy += consumedEnergy; // o roundda harcanan enerjiye ekle
-        cout << "TOTAL CONSUMED : " << totalConsumedEnergy << endl << "--------------" << endl;
+
+        //cout << "------------- NODE 0 STATS --------------";
+        //cout << " ROUND : " << round;
+        //cout << " NODE INDEX : " << nodeIndex;
+        //cout << " MESSAGE TYPE : " << sendingMsgType;
+        //cout << " DECREASED : " << consumedEnergy;
+        //cout << " TOTAL CONSUMED : " << totalConsumedEnergy;
+        //cout << " TOTAL BATTERY : " << initialBattery;
+        //cout << " REMANING BATTERY : " << battery;
+        //cout << "---------------------------" << endl;
 
         //diziHarcEnerji[indisEnerji] = consumedEnergy;
         //indisEnerji++;
@@ -578,5 +585,13 @@ void Node::checkBattery() {
         isBatteryFull = false;
         getDisplayString().parse("i=block/circle,black;is=vs;t=DIED");
         EV << "Battery Finished : " << this->nodeIndex << endl;
+    }
+}
+
+void Node::sendStatsToBaseStation() {
+    if (nodeIndex != hedef && !Util::isMaliciousNode(zararlilar, nodeIndex)) {
+        cMessage *stats = new cMessage("STATS");
+        stats->addPar("CONSUMED_BATTERY").setDoubleValue(totalConsumedEnergy);
+        this->send(stats, hedef);
     }
 }

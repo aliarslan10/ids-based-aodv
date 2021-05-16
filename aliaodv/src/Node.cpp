@@ -32,6 +32,8 @@ void Node::initialize(){
     initialBattery = node->par("battery").doubleValue();
     battery = initialBattery;
 
+    EV << "BATTERY : " << initialBattery << endl;
+
     topolojiX = flatTopologyModule->par("constraintAreaX");
     topolojiY = flatTopologyModule->par("constraintAreaY");
 
@@ -104,6 +106,11 @@ void Node::handleMessage(cMessage *msg) {
                 if (malcs.size() == 1) {
                     komsu.erase(std::remove(komsu.begin(), komsu.end(), malcs[0]), komsu.end());
                     Node::alarm(malcs[0]);
+
+                    // send RREP to legal node - for now it will send first element of the node
+                    // TODO: should send to node which has shortest path and has least hop-count
+                    geriRotalama["sonraki"] = komsu[0];
+                    this->RREP();
                 }
             }
         }
@@ -118,8 +125,6 @@ void Node::handleMessage(cMessage *msg) {
             blackList.push_back(malcsNodeIndex);
             komsu.erase(std::remove(komsu.begin(), komsu.end(), malcsNodeIndex), komsu.end());
             EV << "i removed malicious from my neighbours : " << malcsNodeIndex << endl;
-            if(this->nodeIndex == this->hedef)
-                Node:RREP();
         }
 
 
@@ -146,17 +151,23 @@ void Node::handleMessage(cMessage *msg) {
 
         if(strcmp(msg->getName(), "DATA") == 0){
 
-            EV << "VERİ ALINDI" << endl;
-            EV << "GONDEREN ID   : "<< msg->par("NODE_ID").doubleValue() << endl;
-            EV << "GONDEREN INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
+            EV << "DATA RECEIVED" << endl;
+            EV << "SENDER ID   : "<< msg->par("NODE_ID").doubleValue() << endl;
+            EV << "SENDER INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
 
             if(nodeIndex != hedef) {
                 this->sendData("DATA");
             } else {
-                EV << "VERİ BAŞARIYLA ALINDI." << endl;
+                EV << "DATA RECEIVED BY BASE STATION." << endl;
                 EV << "NEW ROUND IS STARTING..." << endl;
                 this->start();
             }
+        }
+
+        if(strcmp(msg->getName(), "STATS") == 0 && nodeIndex == hedef) {
+            double consumedBattery = msg->par("CONSUMED_BATTERY").doubleValue();
+            totalConsumedBatteryStats += consumedBattery;
+            EV << "ROUND : " << round << " CONSUMED ENERGY STAT : " << totalConsumedBatteryStats << endl;
         }
 
          if(AODVMesajPaketiTipi::RREQ)
@@ -231,14 +242,15 @@ void Node::newRound() {
 
     // FOR BASE STATION
     rreqSenders.clear();
+    sendStatsToBaseStation();
 
     EV << "::::::::::: ROUND " << round << " IS STARTING :::::::::::" << endl;
-    EV << "TOTAL CONSUMED : " << totalConsumedEnergy << endl;
 }
 
 
 void Node::RREQ() {
 
+    cout << "NODE INDEX : " << nodeIndex;
     cout << "RREQ() is triggered. Round : " << round << endl;
 
     AODVRREQ *rreq = new AODVRREQ("RREQ");
@@ -268,9 +280,9 @@ void Node::RREQ() {
 
 void Node::handleRREQ(AODVRREQ *rreq) {
 
-    cout << nodeIndex << " - handleRREQ() is called. Round : " << round << endl;
-
     if (rreq != nullptr) {
+
+        EV << "handleRREQ() : NodeIndex, Round : " << nodeIndex << " - "<< round << endl;
 
         int senderIndex = (int) rreq->par("NODE_INDEX").doubleValue();
         string senderNode = to_string(senderIndex);
@@ -327,7 +339,7 @@ void Node::handleRREQ(AODVRREQ *rreq) {
 
                     if (enKucukHop > guncelHopSayisi || enKucukHop == 0) {
 
-                        EV << "###### ilk geri rotalama ######" << round<<  endl;
+                        EV << "###### ilk geri rotalama ###### round " << round<<  endl;
 
                         enKucukHop = guncelHopSayisi;
 
@@ -362,20 +374,12 @@ void Node::handleRREQ(AODVRREQ *rreq) {
                     EV << "HOP SAYISI   :" << geriRotalama["hopSayisi"] << endl;
 
                     EV << "Her komsudan bir RREQ ::: " << receivedRreqCount << endl;
-                    EV << "Hedef Komsu Sayısı ::: " << komsu.size() << endl;
+                    EV << "Hedef Komsu Sayisi ::: " << komsu.size() << endl;
 
-                    if(receivedRreqCount == komsu.size()) { // Node seçimi tamamlandıktan sonra burası çalışacak
-
-                        EV << "###### GERİ ROTALAMA TAMAMLANDI! ######" << endl << "-------------------------" << endl;
-                        EV << "İlk RREP Gönderilecek Node Index Bilgisi : " << geriRotalama["sonraki"] << endl;
-
+                    if(receivedRreqCount == komsu.size()) {
+                        EV << "###### BACK ROUTE DISCOVERED! ######" << endl << "-------------------------" << endl;
+                        EV << "RREP IS SENDING TO : " << geriRotalama["sonraki"] << endl;
                         this->RREP();
-
-                        if (attackMode == ATTACK_MODE::ON) {
-                            cMessage *msg = new cMessage("WAKE_AND_CHECK_MALCS_ON_DEST");
-                            cancelAndDelete(msg);
-                            cout <<  this->nodeIndex << "previous scheduleAt event removed" << endl;
-                        }
                     }
 
                     if (setMalcsControllerOnDest && attackMode == ATTACK_MODE::ON) {
@@ -390,8 +394,6 @@ void Node::handleRREQ(AODVRREQ *rreq) {
             } else {
 
                if (rreqId != rreq->getRreqId() && nodeIndex != kaynak) {
-
-                   cout << "I AM IN IF and I AM " << nodeIndex << endl << endl;
 
                     geriRotalama["kaynak"]      = rreq->getKaynakAdr();
                     geriRotalama["hedef"]       = rreq->getHedefAdr();
@@ -420,15 +422,13 @@ void Node::handleRREQ(AODVRREQ *rreq) {
 
 void Node::RREP() {
 
-    EV << "RREP Gönderiliyor... " << geriRotalama["sonraki"] << endl;
-
+    EV << "RREP SENDING... " << geriRotalama["sonraki"] << endl;
     AODVRREP *rrep = new AODVRREP("RREP");
     rrep->setKaynakAdr(hedef);
     rrep->setHedefAdr(kaynak);
     rrep->setHopCount(guncelHopSayisi);
     rrep->setHedefSeqNo(2); // Sadece ilk RREP tarafından arttırılabilir.
     rrep->addPar("NODE_INDEX").setDoubleValue(nodeIndex);
-
     this->send(rrep, geriRotalama["sonraki"]);
 }
 
@@ -438,7 +438,7 @@ void Node::handleRREP(AODVRREP *rrep) {
 
         if (nodeIndex != kaynak) {
 
-            EV << "RREP ALINDI.. " << "İLERİ ROTALAMA TABLOSU" << endl << "-------------------------------------" << endl;
+            EV << "RREP ALINDI.. " << "ILERI ROTALAMA TABLOSU" << endl << "-------------------------------------" << endl;
             ileriRotalama["kaynak"]      = rrep->getHedefAdr();
             ileriRotalama["hedef"]       = rrep->getKaynakAdr();
             ileriRotalama["hedefSeqNo"]  = rrep->getHedefSeqNo();
@@ -458,10 +458,9 @@ void Node::handleRREP(AODVRREP *rrep) {
                     cout <<  this->nodeIndex << " - handleRREP() >> MALCS:" << i << endl;
                     Node::alarm(i);
                 }
-            } else {
-                this->RREP();
             }
 
+            this->RREP();
 
         } else {
             ileriRotalama["kaynak"]      = rrep->getHedefAdr();
@@ -470,7 +469,7 @@ void Node::handleRREP(AODVRREP *rrep) {
             ileriRotalama["hopSayisi"]   = guncelHopSayisi;
             ileriRotalama["sonraki"]     = rrep->par("NODE_INDEX");
 
-            EV << "ROTA KEŞFİ TAMAMLANDI. KAYNAK VERİYİ GÖNDERİLİYOR..." << endl;
+            EV << "ROUTE DISCOVERED. DATA IS BEING SENT..." << endl;
             this->sendData("DATA");
         }
     }
@@ -583,13 +582,6 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
 
     battery = battery - consumedEnergy;
 
-    cout << "---------------------------" << endl;
-    cout << "MESSAGE TYPE : " << sendingMsgType << " FROM NODE " << this->nodeIndex << endl;
-    cout << "DECREASED : " << consumedEnergy << endl;
-    cout << "TOTAL BATTERY : " << initialBattery << endl;
-    cout << "REMANING BATTERY : " << battery << endl;
-    cout << "---------------------------" << endl;
-
     // buna gerek yok gibi.. zaten global olarak "battery" değişkeni var.
     // node->par("battery").setDoubleValue(battery); // parametre degerini degistir
 
@@ -597,7 +589,16 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
     if (battery > 0.0001) {
 
         totalConsumedEnergy += consumedEnergy; // o roundda harcanan enerjiye ekle
-        cout << "TOTAL CONSUMED : " << totalConsumedEnergy << endl << "--------------" << endl;
+
+        //cout << "------------- NODE 0 STATS --------------";
+        //cout << " ROUND : " << round;
+        //cout << " NODE INDEX : " << nodeIndex;
+        //cout << " MESSAGE TYPE : " << sendingMsgType;
+        //cout << " DECREASED : " << consumedEnergy;
+        //cout << " TOTAL CONSUMED : " << totalConsumedEnergy;
+        //cout << " TOTAL BATTERY : " << initialBattery;
+        //cout << " REMANING BATTERY : " << battery;
+        //cout << "---------------------------" << endl;
 
         //diziHarcEnerji[indisEnerji] = consumedEnergy;
         //indisEnerji++;
@@ -621,6 +622,14 @@ void Node::checkBattery() {
         isBatteryFull = false;
         getDisplayString().parse("i=block/circle,black;is=vs;t=DIED");
         EV << "Battery Finished : " << this->nodeIndex << endl;
+    }
+}
+
+void Node::sendStatsToBaseStation() {
+    if (nodeIndex != hedef && !Util::isMaliciousNode(zararlilar, nodeIndex)) {
+        cMessage *stats = new cMessage("STATS");
+        stats->addPar("CONSUMED_BATTERY").setDoubleValue(totalConsumedEnergy);
+        this->send(stats, hedef);
     }
 }
 
