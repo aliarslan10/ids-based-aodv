@@ -121,6 +121,7 @@ void Node::newRound() {
     sendStatsToBaseStation();
 
     EV << "::::::::::: ROUND " << round << " IS STARTING :::::::::::" << endl;
+    this->checkBattery();
 }
 
 void Node::handleMessage(cMessage *msg) {
@@ -192,8 +193,6 @@ void Node::handleMessage(cMessage *msg) {
          if(AODVMesajPaketiTipi::RREP)
              handleRREP(dynamic_cast<AODVRREP*>(msg));
     }
-
-    cout << "msg name : " << msg->getName() << endl;
 
     delete msg;
 }
@@ -337,16 +336,11 @@ void Node::RREQ(){
 
 void Node::handleRREQ(AODVRREQ *rreq) {
 
-    cout << nodeIndex << " - handleRREQ() is called. Round : " << round << endl;
-
     if (rreq != nullptr) {
 
         int senderIndex = (int) rreq->par("NODE_INDEX").doubleValue();
         string senderNode = to_string(senderIndex);
         vector<int>::iterator it = std::find(komsu.begin(), komsu.end(), senderIndex);
-
-        EV << " SENDER NODE INDEX " << senderIndex << endl;
-        EV << " I GOT RREQ and I AM " << this->nodeIndex << endl;
 
         /**
          * Eger komsu listemde varsa handle et. Yoksa handle etme.
@@ -355,6 +349,11 @@ void Node::handleRREQ(AODVRREQ *rreq) {
          * tek tarafin komsuya eklemesi durumu
          */
         if (it != komsu.end()) {
+
+            cout << nodeIndex << " - handleRREQ() is called. Round : " << round << endl;
+            EV << " SENDER NODE INDEX " << senderIndex << endl;
+            EV << " I GOT RREQ and I AM " << this->nodeIndex << endl;
+
 
             guncelHopSayisi = rreq->getHopCount() + 1;
             rreqSenders.push_back(senderIndex);
@@ -580,6 +579,13 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
 }
 
 void Node::checkBattery() {
+
+    cout << " ROUND : " << round;
+    cout << " NODE INDEX : " << nodeIndex;
+    cout << " DECREASED : " << consumedEnergy;
+    cout << " TOTAL CONSUMED : " << totalConsumedEnergy;
+    cout << " TOTAL BATTERY : " << initialBattery;
+    cout << " REMANING BATTERY : " << battery;
 
     if (battery < (initialBattery * 0.05) && this->nodeIndex != hedef) {
         isBatteryFull = false;

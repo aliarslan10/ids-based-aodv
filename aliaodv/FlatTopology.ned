@@ -42,6 +42,8 @@ network FlatTopology
         int constraintAreaX;
         int constraintAreaY;
         
+        int maliciousForEachRound;
+        
         @display("bgb=$constraintAreaX,$constraintAreaY");
 
     submodules:

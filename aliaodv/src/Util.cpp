@@ -18,34 +18,49 @@ double Util::calculateDiagonalDistance(int xSideLength, int ySideLength) {
  }
 
 bool Util::isMaliciousNode(string malicious, int nodeIndex) {
-    vector<int> maliciousNodes;
-    stringstream maliciousNodesFromConfig(malicious);
+
     bool nodeMaliciousStatus = false;
 
-    for (int i; maliciousNodesFromConfig >> i;) {
-        maliciousNodes.push_back(i);
-        if (maliciousNodesFromConfig.peek() == ',')
-            maliciousNodesFromConfig.ignore();
-    }
+    if (!malicious.empty()) {
+        vector<int> maliciousNodes;
+        stringstream maliciousNodesFromConfig(malicious);
 
-    for (int malicious : maliciousNodes) {
-        if(malicious == nodeIndex){
-            nodeMaliciousStatus = true;
+        for (int i; maliciousNodesFromConfig >> i;) {
+            maliciousNodes.push_back(i);
+            if (maliciousNodesFromConfig.peek() == ',')
+                maliciousNodesFromConfig.ignore();
+        }
+
+        for (int malicious : maliciousNodes) {
+            if(malicious == nodeIndex){
+                nodeMaliciousStatus = true;
+            }
         }
     }
 
     return nodeMaliciousStatus;
 }
 
+vector<int> Util::csvToVector(string commaSeparatedValue) {
+    vector<int> values;
+    stringstream streamedValue(commaSeparatedValue);
 
-string Util::vectorToString(vector<int> neighborsVector) {
+    for (int i; streamedValue >> i;) {
+        values.push_back(i);
+        if (streamedValue.peek() == ',')
+            streamedValue.ignore();
+    }
+
+    return values;
+}
+
+string Util::vectorToCSV(vector<int> vector) {
     string neighbors;
-    for(int item : neighborsVector) {
+    for(int item : vector) {
         neighbors += to_string(item) + ",";
     }
     neighbors.pop_back();
     return neighbors;
-
 }
 
 vector<int> Util::checkMaliciousNodes(vector<int> neighbors, vector<int> rreqSenders) {
@@ -61,4 +76,29 @@ vector<int> Util::checkMaliciousNodes(vector<int> neighbors, vector<int> rreqSen
 int Util::randomNumberGenerator(int min, int max) {
     srand(static_cast <unsigned int> (time(0)));
     return rand() % max + min;
+}
+
+vector<int> Util::selectRandomValues(vector<int> items, int quantity) {
+
+    vector<int> selectedValues;
+    int selectedItem;
+
+    quantity = (quantity < items.size()) ? quantity : items.size();
+
+    for (int i = 0; i < quantity; i++) {
+        selectedItem = rand() % items.size();
+        cout << "selectedItem - index : " << selectedItem << endl;
+        cout << "iterator - selected value : " << items[selectedItem] << endl;
+        selectedValues.push_back(items[selectedItem]);
+        items.erase(find(items.begin(), items.end(), items[selectedItem]));
+    }
+    return selectedValues;
+}
+
+
+vector<int> Util::updateVector(vector<int> items, vector<int> selectedValues) {
+  for (int value : selectedValues) {
+    items.erase(find(items.begin(), items.end(), value));
+  }
+  return items;
 }

@@ -39,12 +39,12 @@ class Node : public cSimpleModule {
         int zararliPaketBoyutu;
         int ddosGonderimSayisi;
         int saldiriSayisi = 0;
-        const char* zararlilar;
+        string zararlilar;
         bool isHelloSent = false;
+        int helloId = 0;
 
         vector<int> komsu;
         vector<int> routes;
-        string route;
         vector<int> rreqSenders;
         map<string, int> geriRotalama;
         map<string, int> ileriRotalama;
@@ -52,6 +52,7 @@ class Node : public cSimpleModule {
         vector<string> neighborsOfNodesOnTheRoute;
         bool setMalcsControllerOnDest = true;
         vector<int> blackList;
+        int alarmId;
 
         int rreqId = 0;
         int receivedRreqCount = 0; // to select smaller hop
@@ -77,6 +78,7 @@ class Node : public cSimpleModule {
         int dataPacketSize;
         int selectedSeed;
         double totalConsumedBatteryStats = 0;
+        int maliciousCountThatWeNeedForEachRound = 10;
 
     protected:
         virtual void initialize();
@@ -97,9 +99,13 @@ class Node : public cSimpleModule {
         void broadcastAlarm(int malcsNodeIndex);
         void broadcast(cMessage *msg);
         void newRound();
+        void startNewRound();
         void decreaseBattery(double distance, int msgSendingType, int payload);
         void checkBattery();
         void sendStatsToBaseStation();
+
+        void setMaliciousNodesIfAttackModeActive(string maliciousCSV);
+        vector<int> baseStationMaliciousList;
 };
 
 #endif /* NODE_H_ */

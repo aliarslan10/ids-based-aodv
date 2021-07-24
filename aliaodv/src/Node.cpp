@@ -25,10 +25,11 @@ void Node::initialize(){
     radius = flatTopologyModule->par("radius");
     malcsRadius = flatTopologyModule->par("malcsRadius");
     attackMode = flatTopologyModule->par("attackMode");
-    zararlilar = flatTopologyModule->par("zararlilar");
+    //zararlilar = flatTopologyModule->par("zararlilar");
     packetSize = flatTopologyModule->par("packetSize");
     dataPacketSize = flatTopologyModule->par("dataPacketSize");
     selectedSeed = flatTopologyModule->par("selectedSeed");
+    maliciousCountThatWeNeedForEachRound = flatTopologyModule->par("maliciousForEachRound");
     initialBattery = node->par("battery").doubleValue();
     battery = initialBattery;
 
@@ -44,15 +45,6 @@ void Node::initialize(){
     nodeKordinatY  = intuniform (5, topolojiY, selectedSeed);
     getDisplayString().setTagArg("p", 0, nodeKordinatX);
     getDisplayString().setTagArg("p", 1, nodeKordinatY);
-
-    // get malicious nodes and set them in simulation
-    if (attackMode == ATTACK_MODE::ON) {
-        if(Util::isMaliciousNode(zararlilar, nodeIndex)) {
-            getDisplayString().setTagArg("t", 0, "MALCS.");
-            getDisplayString().setTagArg("i", 1, "YELLOW");
-            radius = malcsRadius;
-        }
-    }
 
     getDisplayString().setTagArg("r", 0, radius);
 
@@ -83,12 +75,32 @@ void Node::initialize(){
         getDisplayString().setTagArg("t", 0, "BASE STATION");
         getDisplayString().setTagArg("i", 0, "device/antennatower");
         getDisplayString().setTagArg("is",0, "m");
+        zararlilar = flatTopologyModule->par("zararlilar").stringValue();
+        baseStationMaliciousList = Util::csvToVector(zararlilar);
         this->start();
+    }
+}
+
+void Node::setMaliciousNodesIfAttackModeActive(string maliciousCSV) {
+    if (attackMode == ATTACK_MODE::ON) {
+        if(Util::isMaliciousNode(maliciousCSV, nodeIndex)) {
+            EV << " MALICIOUS -->" << nodeIndex << endl;
+            getDisplayString().setTagArg("t", 0, "MALCS.");
+            getDisplayString().setTagArg("i", 1, "YELLOW");
+            radius = malcsRadius;
+        }
     }
 }
 
 void Node::start() {
     cMessage *start = new cMessage("START");
+    if (baseStationMaliciousList.size() > 0) {
+        vector<int> maliciousList = Util::selectRandomValues(baseStationMaliciousList, maliciousCountThatWeNeedForEachRound);
+        zararlilar = Util::vectorToCSV(maliciousList);
+        baseStationMaliciousList = Util::updateVector(baseStationMaliciousList, maliciousList);
+    }
+    cout << "xxxx zararlilar xxxxx" << zararlilar << endl;
+    start->addPar("MALICIOUS").setStringValue(zararlilar.c_str());
     this->broadcast(start);
 }
 
@@ -99,13 +111,24 @@ void Node::handleMessage(cMessage *msg) {
         this->decreaseBattery(0, MSG_TYPE::RECEIVING, packetSize);
 
         if (strcmp(msg->getName(), "WAKE_AND_CHECK_MALCS_ON_DEST") == 0) {
+
+            cout << "BASE STATION WILL CREATE ALARM" << endl;
+            cout << "BASE STATION WILL CREATE ALARM" << receivedRreqCount << endl;
+            cout << "BASE STATION WILL CREATE ALARM" << komsu.size() << endl;
+
+            //// ZARARLI RREQ GONDERDI. ALARM O YUZDEN FIRLAMIYOR!!!
             if(receivedRreqCount != komsu.size()) {
                 vector<int> malcs = Util::checkMaliciousNodes(komsu, rreqSenders);
 
                 // TODO: broadcast one alarm for multi malcious
-                if (malcs.size() == 1) {
-                    komsu.erase(std::remove(komsu.begin(), komsu.end(), malcs[0]), komsu.end());
-                    Node::alarm(malcs[0]);
+                if (malcs.size() > 0) {
+
+                    for (int malicious : malcs) {
+                        komsu.erase(std::remove(komsu.begin(), komsu.end(), malicious), komsu.end());
+                        Node::alarm(malicious);
+                    }
+
+                    /// removing it from neighb's list is enough. no need to create an alarm.
 
                     // send RREP to legal node - for now it will send first element of the node
                     // TODO: should send to node which has shortest path and has least hop-count
@@ -124,14 +147,14 @@ void Node::handleMessage(cMessage *msg) {
             int malcsNodeIndex = (int) msg->par("MLCS_NODE_INDEX").doubleValue();
             blackList.push_back(malcsNodeIndex);
             komsu.erase(std::remove(komsu.begin(), komsu.end(), malcsNodeIndex), komsu.end());
-            EV << "i removed malicious from my neighbours : " << malcsNodeIndex << endl;
+            EV << nodeIndex << " i removed malicious from my neighbours : " << malcsNodeIndex << endl;
         }
 
 
         if (strcmp(msg->getName(), "START") == 0) {
+            zararlilar = msg->par("MALICIOUS").stringValue();
+            this->setMaliciousNodesIfAttackModeActive(zararlilar);
             this->newRound();
-            if (nodeIndex == kaynak)
-                round == 1 ? this->sendHello() : this->RREQ();
         }
 
         if (strcmp(msg->getName(), "HELLO") == 0 && this->nodeIndex != msg->par("NODE_INDEX").doubleValue()) {
@@ -142,14 +165,14 @@ void Node::handleMessage(cMessage *msg) {
              */
             if (attackMode == ATTACK_MODE::OFF)
                 handleHello(msg);
-            else if (!Util::isMaliciousNode(zararlilar, nodeIndex))
+            else if (!Util::isMaliciousNode(zararlilar, nodeIndex)) /// !!!!!!!!!SORUN BURADA!!!!!!!!!!!!!
                 handleHello(msg);
             else
                 this->sendHello();
         }
 
 
-        if(strcmp(msg->getName(), "DATA") == 0){
+        if(strcmp(msg->getName(), "DATA") == 0) {
 
             EV << "DATA RECEIVED" << endl;
             EV << "SENDER ID   : "<< msg->par("NODE_ID").doubleValue() << endl;
@@ -182,16 +205,20 @@ void Node::handleMessage(cMessage *msg) {
 
 void Node::sendHello() {
 
-    if (!isHelloSent) {
+    cout << "\n ------------------------------------------------------------ \n ";
+    cout << "ROUND " << round << " helloId Status : " << helloId << endl;
+    cout << "\n ------------------------------------------------------------ \n ";
+
+    if (helloId == round) {
         cMessage *hello = new cMessage("HELLO");
+        hello->addPar("HELLO_ID").setDoubleValue(helloId);
         hello->addPar("NODE_ABSCISSA").setDoubleValue(this->nodeKordinatX);
         hello->addPar("NODE_ORDINATE").setDoubleValue(this->nodeKordinatY);
         hello->addPar("NODE_INDEX").setDoubleValue(this->nodeIndex);
         hello->addPar("NODE_RADIUS").setDoubleValue(this->radius);
 
         this->broadcast(hello);
-
-        isHelloSent = true;
+        helloId++;
     }
 }
 
@@ -204,6 +231,10 @@ void Node::handleHello(cMessage *msg) {
 
     double distance = Util::calculateTwoNodeDistance(nodeKordinatX, nodeKordinatY, senderCoordinateX, senderCoordinateY);
 
+    EV << "SENDER NODE ::: " << senderIndex << endl;
+    EV << "DISTANCE :::::: " << distance << endl;
+    EV << "SENDER RADIUS : " << senderRadius << endl;
+
     if(distance < senderRadius && senderIndex != this->nodeIndex) {
         this->setAsNeighbor(senderIndex);
     }
@@ -213,9 +244,14 @@ void Node::handleHello(cMessage *msg) {
 
         helloMesajiSayisi++;
 
-        if(helloMesajiSayisi == nodeSayisi-1) {
 
-            EV << this->nodeIndex << " ::: RREQ STARTED :::" << endl << endl;
+        cout << "helloCount " << helloMesajiSayisi << endl;
+        cout << "nodeSayisi " << nodeSayisi << endl;
+
+
+        if(helloMesajiSayisi == nodeSayisi-1) { // helloMesajiSayisi <= nodeSayisi-1
+
+            EV << this->nodeIndex << " ::: RREQ STARTED :::" << "ROUND : " << round << endl;
             scheduleStart(simTime()+uniform(500,1000)); // wait and start RREQ
             this->RREQ();
         }
@@ -227,30 +263,40 @@ void Node::handleHello(cMessage *msg) {
 void Node::newRound() {
 
     round++;
+    helloId = round;
 
-    if (nodeIndex == kaynak) {
-        rreqId++;
-        hedefSeqNo++;
+    // if attackMode is active, then new round will start with hello message
+    if (attackMode == ATTACK_MODE::ON) {
+        komsu.clear();
+        helloMesajiSayisi = 0;
     }
-
-    // this configs disabled because of new round will care each rreq.
-    // starting new round with hello message no longer supported.
-    //komsu.clear();
-    //route = "";
-    //isHelloSent = false;
-    //helloMesajiSayisi = 0;
 
     // FOR BASE STATION
     rreqSenders.clear();
     sendStatsToBaseStation();
 
+    this->checkBattery();
+    this->startNewRound();
+}
+
+void Node::startNewRound() {
+
+    if (nodeIndex == kaynak) {
+
+        rreqId++;
+        hedefSeqNo++;
+
+        if (attackMode == ATTACK_MODE::ON) {
+            this->sendHello();
+        } else {
+            round == 1 ? this->sendHello() : this->RREQ();
+        }
+    }
     EV << "::::::::::: ROUND " << round << " IS STARTING :::::::::::" << endl;
 }
 
-
 void Node::RREQ() {
 
-    cout << "NODE INDEX : " << nodeIndex;
     cout << "RREQ() is triggered. Round : " << round << endl;
 
     AODVRREQ *rreq = new AODVRREQ("RREQ");
@@ -282,32 +328,20 @@ void Node::handleRREQ(AODVRREQ *rreq) {
 
     if (rreq != nullptr) {
 
-        EV << "handleRREQ() : NodeIndex, Round : " << nodeIndex << " - "<< round << endl;
-
         int senderIndex = (int) rreq->par("NODE_INDEX").doubleValue();
-        string senderNode = to_string(senderIndex);
         vector<int>::iterator it = std::find(komsu.begin(), komsu.end(), senderIndex);
 
-
-        EV << " SENDER NODE INDEX " << senderIndex << endl;
-        EV << " I GOT RREQ and I AM " << this->nodeIndex << endl;
-
         /**
-         * Eğer komsu listemde varsa handle et. Yoksa handle etme.
-         * Hello zararlısının yaptığı şey de bu aslında.
-         * Kendini komsu gibi gösterip, kendisine gönderilen paketlerin boşluğa gitmesi.
-         * tek tarafın komsuya eklemesi durumu
+         * Eger komsu listemde varsa handle et. Yoksa handle etme.
+         * Hello zararlisinin yaptigi sey de bu aslinda.
+         * Kendini komsu gibi gosterip, kendisine gonderilen paketlerin bosluga gitmesi.
+         * tek tarafin komsuya eklemesi durumu
          */
         if (it != komsu.end()) {
 
-            /*
-            string senderStorage(rreq->par("NEIGHBORS_STORAGE").stringValue());
-            route = (senderNode + "," + senderStorage);
-            if (nodeIndex == hedef) {
-                neighborsOfNodesOnTheRoute.push_back(route);
-                EV << "Route : " <<  route << endl;
-            }
-            */
+            cout << nodeIndex << " - handleRREQ() is called. Round : " << round << endl;
+            EV << " SENDER NODE INDEX " << senderIndex << endl;
+            EV << " I GOT RREQ and I AM " << this->nodeIndex << endl;
 
             //check rreq on dest
             if (rreqId != rreq->getRreqId() && nodeIndex == hedef && attackMode == ATTACK_MODE::ON) {
@@ -321,8 +355,6 @@ void Node::handleRREQ(AODVRREQ *rreq) {
             guncelHopSayisi = rreq->getHopCount() + 1;
             rreqSenders.push_back(senderIndex);
             receivedRreqCount = rreqSenders.size();
-
-            EV << "NODE INDEX - HEDEF " << nodeIndex << " - " << hedef << endl;
 
             if (nodeIndex == hedef) {
 
@@ -382,10 +414,15 @@ void Node::handleRREQ(AODVRREQ *rreq) {
                         this->RREP();
                     }
 
+                    cout << "setMalcsControllerOnDest" << setMalcsControllerOnDest << endl;
+                    cout << "attackMode" << attackMode << endl;
+
                     if (setMalcsControllerOnDest && attackMode == ATTACK_MODE::ON) {
+                        cout << "create WAKE_AND_CHECK_MALCS_ON_DEST" << endl;
                         setMalcsControllerOnDest = false;
                         cMessage *msg = new cMessage("WAKE_AND_CHECK_MALCS_ON_DEST");
                         double delay = 0.1 * komsu.size();
+                        cout << "delay ::: " << delay << endl;
                         scheduleAt(simTime()+delay, msg);
                     }
 
@@ -521,10 +558,14 @@ void Node::alarm(int malcsNodeIndex) {
     EV << "Malicious node is detected. MalcsId: " << malcsNodeIndex << endl;
     cMessage *unicastAlarm = new cMessage("UNICAST_ALARM");
     unicastAlarm->addPar("MLCS_NODE_INDEX").setDoubleValue(malcsNodeIndex);
-    if(nodeIndex != hedef) {
-        this->send(unicastAlarm, ileriRotalama["sonraki"]);
-    } else {
-        this->broadcastAlarm(malcsNodeIndex);
+    vector<int>::iterator it = std::find(blackList.begin(), blackList.end(), malcsNodeIndex);
+    if (hedef != malcsNodeIndex && alarmId != malcsNodeIndex && it == blackList.end()) { // eger kara listemde yoksa..
+        alarmId = malcsNodeIndex;
+        if(nodeIndex != hedef) {
+            this->send(unicastAlarm, ileriRotalama["sonraki"]);
+        } else {
+            this->broadcastAlarm(malcsNodeIndex);
+        }
     }
 }
 
@@ -580,7 +621,8 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
         consumedEnergy = E_DA * payload;
     } */
 
-    battery = battery - consumedEnergy;
+    if (nodeIndex != kaynak)
+        battery = battery - consumedEnergy;
 
     // buna gerek yok gibi.. zaten global olarak "battery" değişkeni var.
     // node->par("battery").setDoubleValue(battery); // parametre degerini degistir
@@ -618,6 +660,13 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
 
 void Node::checkBattery() {
 
+    cout << " ROUND : " << round;
+    cout << " NODE INDEX : " << nodeIndex;
+    cout << " DECREASED : " << consumedEnergy;
+    cout << " TOTAL CONSUMED : " << totalConsumedEnergy;
+    cout << " TOTAL BATTERY : " << initialBattery;
+    cout << " REMANING BATTERY : " << battery;
+
     if (battery < (initialBattery * 0.05) && this->nodeIndex != hedef) {
         isBatteryFull = false;
         getDisplayString().parse("i=block/circle,black;is=vs;t=DIED");
@@ -626,6 +675,7 @@ void Node::checkBattery() {
 }
 
 void Node::sendStatsToBaseStation() {
+    cout << "\n\n sendstattobasestation() :: " << zararlilar << endl;
     if (nodeIndex != hedef && !Util::isMaliciousNode(zararlilar, nodeIndex)) {
         cMessage *stats = new cMessage("STATS");
         stats->addPar("CONSUMED_BATTERY").setDoubleValue(totalConsumedEnergy);

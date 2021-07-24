@@ -43,7 +43,7 @@ class Node : public cSimpleModule {
         int zararliPaketBoyutu;
         int ddosGonderimSayisi;
         int saldiriSayisi = 0;
-        const char* zararlilar;
+        string zararlilar;
         bool isHelloSent = false;
 
         vector<int> komsu;
