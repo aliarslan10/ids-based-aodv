@@ -52,6 +52,7 @@ class Node : public cSimpleModule {
         vector<string> neighborsOfNodesOnTheRoute;
         bool setMalcsControllerOnDest = true;
         vector<int> blackList;
+        int alarmId;
 
         int rreqId = 0;
         int receivedRreqCount = 0; // to select smaller hop

@@ -100,14 +100,15 @@ void Node::handleMessage(cMessage *msg) {
 
         if (strcmp(msg->getName(), "WAKE_AND_CHECK_MALCS_ON_DEST") == 0) {
             if(receivedRreqCount != komsu.size()) {
-                vector<int> malcs = Util::checkMaliciousNodes(komsu, rreqSenders);
+                vector<int> malcs = Util::detectMaliciousNodes(komsu, rreqSenders);
 
-                // TODO: broadcast one alarm for multi malcious
-                if (malcs.size() == 1) {
-                    komsu.erase(std::remove(komsu.begin(), komsu.end(), malcs[0]), komsu.end());
-                    Node::alarm(malcs[0]);
+                if (malcs.size() > 0) {
+                    for (int malicious : malcs) {
+                        komsu.erase(std::remove(komsu.begin(), komsu.end(), malicious), komsu.end());
+                        Node::alarm(malicious);
+                    }
 
-                    // send RREP to legal node - for now it will send first element of the node
+                    // (to inform about malicious) send RREP to legal node - for now it will send first element of the node
                     // TODO: should send to node which has shortest path and has least hop-count
                     geriRotalama["sonraki"] = komsu[0];
                     this->RREP();
@@ -167,7 +168,7 @@ void Node::handleMessage(cMessage *msg) {
         if(strcmp(msg->getName(), "STATS") == 0 && nodeIndex == hedef) {
             double consumedBattery = msg->par("CONSUMED_BATTERY").doubleValue();
             totalConsumedBatteryStats += consumedBattery;
-            EV << "ROUND : " << round << " CONSUMED ENERGY STAT : " << totalConsumedBatteryStats << endl;
+            EV << "ROUND : " << round << " CONSUMED ENERGY STAT - ALIAODV : " << totalConsumedBatteryStats << endl;
         }
 
          if(AODVMesajPaketiTipi::RREQ)
@@ -453,7 +454,7 @@ void Node::handleRREP(AODVRREP *rrep) {
             EV << "rreqSenders.size() " << rreqSenders.size() << endl;
 
             if (senderIndex != hedef && komsu.size() != rreqSenders.size()) {
-                vector<int> malcs = Util::checkMaliciousNodes(komsu, rreqSenders);
+                vector<int> malcs = Util::detectMaliciousNodes(komsu, rreqSenders);
                 for (int i : malcs) {
                     cout <<  this->nodeIndex << " - handleRREP() >> MALCS:" << i << endl;
                     Node::alarm(i);
@@ -521,10 +522,14 @@ void Node::alarm(int malcsNodeIndex) {
     EV << "Malicious node is detected. MalcsId: " << malcsNodeIndex << endl;
     cMessage *unicastAlarm = new cMessage("UNICAST_ALARM");
     unicastAlarm->addPar("MLCS_NODE_INDEX").setDoubleValue(malcsNodeIndex);
-    if(nodeIndex != hedef) {
-        this->send(unicastAlarm, ileriRotalama["sonraki"]);
-    } else {
-        this->broadcastAlarm(malcsNodeIndex);
+    vector<int>::iterator it = std::find(blackList.begin(), blackList.end(), malcsNodeIndex); // SEND ALARM ONLY ONCE FOR A SAME MALICIOUS NODE.
+    if (hedef != malcsNodeIndex && alarmId != malcsNodeIndex && it == blackList.end()) { // eger kara listemde yoksa..
+        alarmId = malcsNodeIndex;
+        if(nodeIndex != hedef) {
+            this->send(unicastAlarm, ileriRotalama["sonraki"]);
+        } else {
+            this->broadcastAlarm(malcsNodeIndex);
+        }
     }
 }
 
@@ -582,10 +587,7 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
 
     battery = battery - consumedEnergy;
 
-    // buna gerek yok gibi.. zaten global olarak "battery" değişkeni var.
-    // node->par("battery").setDoubleValue(battery); // parametre degerini degistir
-
-    // varsayılan - round sonunda belli olacak
+    // varsayilan - round sonunda belli olacak
     if (battery > 0.0001) {
 
         totalConsumedEnergy += consumedEnergy; // o roundda harcanan enerjiye ekle
@@ -617,7 +619,6 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
 }
 
 void Node::checkBattery() {
-
     if (battery < (initialBattery * 0.05) && this->nodeIndex != hedef) {
         isBatteryFull = false;
         getDisplayString().parse("i=block/circle,black;is=vs;t=DIED");

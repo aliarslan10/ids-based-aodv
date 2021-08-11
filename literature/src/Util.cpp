@@ -1,8 +1,8 @@
 /*
  * Util.cpp
  *
- *  Created on: 30 Tem 2020
- *      Author: Ali Arslan
+ * Created on: 30 Tem 2020
+ * Author: Ali Arslan
  */
 
 #include "Util.h"

@@ -183,7 +183,7 @@ void Node::handleMessage(cMessage *msg) {
 
         if(strcmp(msg->getName(), "STATS") == 0 && nodeIndex == hedef) {
             totalConsumedBatteryStats += msg->par("CONSUMED_BATTERY").doubleValue();;
-            EV << "ROUND : " << round << " CONSUMED ENERGY STAT : " << totalConsumedBatteryStats << endl;
+            EV << "ROUND : " << round << " CONSUMED ENERGY STAT - LITERATURE : " << totalConsumedBatteryStats << endl;
         }
 
          if(AODVMesajPaketiTipi::RREQ && strcmp(msg->getName(), "RREQ") == 0)
@@ -580,7 +580,6 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
 }
 
 void Node::checkBattery() {
-
     if (battery < (initialBattery * 0.05) && this->nodeIndex != hedef) {
         isBatteryFull = false;
         getDisplayString().parse("i=block/circle,black;is=vs;t=DIED");

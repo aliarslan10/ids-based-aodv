@@ -48,7 +48,7 @@ string Util::vectorToString(vector<int> neighborsVector) {
 
 }
 
-vector<int> Util::checkMaliciousNodes(vector<int> neighbors, vector<int> rreqSenders) {
+vector<int> Util::detectMaliciousNodes(vector<int> neighbors, vector<int> rreqSenders) {
 
     for(int sender : rreqSenders) {
         neighbors.erase(std::remove(neighbors.begin(), neighbors.end(), sender), neighbors.end());
