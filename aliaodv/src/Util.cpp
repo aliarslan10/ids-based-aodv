@@ -57,8 +57,16 @@ vector<int> Util::detectMaliciousNodes(vector<int> neighbors, vector<int> rreqSe
     return neighbors;
 }
 
+vector<int> Util::stringToVector(string str) {
+    vector<int> vector;
+    stringstream strStream(str);
 
-int Util::randomNumberGenerator(int min, int max) {
-    srand(static_cast <unsigned int> (time(0)));
-    return rand() % max + min;
+    for (int i; strStream >> i;) {
+        vector.push_back(i);
+        if (strStream.peek() == ',')
+            strStream.ignore();
+    }
+
+    return vector;
 }
+

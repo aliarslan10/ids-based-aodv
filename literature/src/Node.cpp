@@ -20,8 +20,8 @@ void Node::initialize(){
 
     flatTopologyModule = getModuleByPath("FlatTopology");
     nodeSayisi = flatTopologyModule->par("nodeSayisi");
-    kaynak = flatTopologyModule->par("kaynak");
-    hedef  = flatTopologyModule->par("hedef");
+    sources = flatTopologyModule->par("sources").stringValue();
+    destination  = flatTopologyModule->par("destination");
     radius = flatTopologyModule->par("radius");
     malcsRadius = flatTopologyModule->par("malcsRadius");
     minRSS = flatTopologyModule->par("minRss");
@@ -30,12 +30,13 @@ void Node::initialize(){
     malcsRSS = flatTopologyModule->par("malcsRSS");
     delayTime = flatTopologyModule->par("delayTime");
     attackMode = flatTopologyModule->par("attackMode");
-    zararlilar = flatTopologyModule->par("zararlilar");
+    malcsNodes = flatTopologyModule->par("malcsNodes");
     packetSize = flatTopologyModule->par("packetSize");
     dataPacketSize = flatTopologyModule->par("dataPacketSize");
     selectedSeed = flatTopologyModule->par("selectedSeed");
     initialBattery = node->par("battery").doubleValue();
     battery = initialBattery;
+    sourceVector = Util::stringToVector(sources);
 
     topolojiX = flatTopologyModule->par("constraintAreaX");
     topolojiY = flatTopologyModule->par("constraintAreaY");
@@ -55,7 +56,7 @@ void Node::initialize(){
 
     // get malicious nodes and set them in simulation
     if (attackMode == ATTACK_MODE::ON) {
-        if(Util::isMaliciousNode(zararlilar, nodeIndex)) {
+        if(Util::isMaliciousNode(malcsNodes, nodeIndex)) {
             getDisplayString().setTagArg("t", 0, "MALCS.");
             getDisplayString().setTagArg("i", 1, "YELLOW");
             radius = malcsRadius;
@@ -82,18 +83,9 @@ void Node::initialize(){
     thDistance = flatTopologyModule->par("thDistance");
 
     /**
-     * SET RANDOM SOURCE NODE
-     */
-    //kaynak = Util::randomNumberGenerator(0, nodeSayisi);
-    if(nodeIndex == kaynak) {
-        rss = avgRSS; // source shouldn't be malcs or suspcs.
-        getDisplayString().setTagArg("t", 0, "SOURCE");
-    }
-
-    /**
      * BASE WILL START TO SIMULATION - ROUND 1
      */
-    if(nodeIndex == hedef) {
+    if(nodeIndex == destination) {
         rss = avgRSS; // destination shouldn't be malcs or suspcs.
         getDisplayString().setTagArg("t", 0, "BASE STATION");
         getDisplayString().setTagArg("i", 0, "device/antennatower");
@@ -111,7 +103,13 @@ void Node::newRound() {
 
     round++;
 
-    if (nodeIndex == kaynak) {
+    if (nodeIndex == source)
+        getDisplayString().removeTag("t");
+
+    source = sourceVector[round % sourceVector.size()];
+
+    if (nodeIndex == source) {
+        getDisplayString().setTagArg("t", 0, "SOURCE");
         rreqId++;
         hedefSeqNo++;
     }
@@ -120,7 +118,9 @@ void Node::newRound() {
     rreqSenders.clear();
     sendStatsToBaseStation();
 
-    EV << "::::::::::: ROUND " << round << " IS STARTING :::::::::::" << endl;
+    EV << "::::::::::: ROUND " << round << " IS STARTING :::::::::::";
+    EV << "::::::::::: NEW SOURCE " << source;
+    EV << "::::::::::: RREQ ID " << rreqId << endl;
 }
 
 void Node::handleMessage(cMessage *msg) {
@@ -131,7 +131,7 @@ void Node::handleMessage(cMessage *msg) {
 
         if (strcmp(msg->getName(), "START") == 0) {
             this->newRound();
-            if (nodeIndex == kaynak)
+            if (nodeIndex == source)
                 round == 1 ? this->sendHello() : this->RREQ();
         }
 
@@ -146,7 +146,7 @@ void Node::handleMessage(cMessage *msg) {
             EV << "SENDER ID   : "<< msg->par("NODE_ID").doubleValue() << endl;
             EV << "SENDER INDEX: "<< msg->par("NODE_INDEX").doubleValue() << endl;
 
-            if(nodeIndex != hedef) {
+            if(nodeIndex != destination) {
                 this->sendData("DATA");
             } else {
                 EV << "DATA RECEIVED BY BASE STATION." << endl;
@@ -172,7 +172,7 @@ void Node::handleMessage(cMessage *msg) {
             EV <<  "I GOT TEST_MSG_RESP FROM " << sender << endl;
             EV << "DELAY : " << delay << " //// SENDER : " << sender << endl;
             if (delay < delayTime) this->setAsNeighbor(sender);
-            if (isWaitingForTestMsgResponse && nodeIndex == kaynak) {
+            if (isWaitingForTestMsgResponse && nodeIndex == source) {
                 cout << "start new rreq from here" << endl;
                 EV << "start new rreq from here" << endl;
                 isWaitingForTestMsgResponse = false;
@@ -181,7 +181,7 @@ void Node::handleMessage(cMessage *msg) {
         }
         /* ########## END - CHECK SUSPICIOUS NODE ########## */
 
-        if(strcmp(msg->getName(), "STATS") == 0 && nodeIndex == hedef) {
+        if(strcmp(msg->getName(), "STATS") == 0 && nodeIndex == destination) {
             totalConsumedBatteryStats += msg->par("CONSUMED_BATTERY").doubleValue();;
             EV << "ROUND : " << round << " CONSUMED ENERGY STAT - LITERATURE : " << totalConsumedBatteryStats << endl;
         }
@@ -239,7 +239,7 @@ void Node::handleHello(cMessage *msg){
         }
     }
 
-    if(nodeIndex == kaynak) {
+    if(nodeIndex == source) {
 
         helloMesajiSayisi++;
 
@@ -296,7 +296,7 @@ bool Node::isHelloAttack(int senderRSS, int senderIndex, double sentTime) {
         cMessage *testMsg = new cMessage("TEST_MSG");
         testMsg->addPar("TEST_MSG_SENDER_INDEX").setDoubleValue(nodeIndex);
 
-        if (nodeIndex == kaynak) isWaitingForTestMsgResponse = true;
+        if (nodeIndex == source) isWaitingForTestMsgResponse = true;
 
         this->send(testMsg, senderIndex);
 
@@ -311,9 +311,9 @@ void Node::RREQ(){
     cout << "RREQ() is triggered. Round : " << round << endl;
 
     AODVRREQ *rreq = new AODVRREQ("RREQ");
-    rreq->setKaynakAdr(kaynak);
+    rreq->setKaynakAdr(source);
     rreq->setRreqId(rreqId);
-    rreq->setHedefAdr(hedef);
+    rreq->setHedefAdr(destination);
     rreq->setHopCount(guncelHopSayisi);
     rreq->setHedefSeqNo(1);
     rreq->addPar("NODE_INDEX");
@@ -360,7 +360,7 @@ void Node::handleRREQ(AODVRREQ *rreq) {
             rreqSenders.push_back(senderIndex);
             receivedRreqCount = rreqSenders.size();
 
-            if (nodeIndex == hedef) {
+            if (nodeIndex == destination) {
 
                 if (receivedRreqCount <= komsu.size()) {
 
@@ -415,7 +415,7 @@ void Node::handleRREQ(AODVRREQ *rreq) {
 
             } else {
 
-               if(rreqId != rreq->getRreqId() && nodeIndex != kaynak){
+               if(rreqId != rreq->getRreqId() && nodeIndex != source){
 
                     geriRotalama["kaynak"]      = rreq->getKaynakAdr();
                     geriRotalama["hedef"]       = rreq->getHedefAdr();
@@ -449,8 +449,8 @@ void Node::RREP(){
     EV << "RREP Gonderiliyor..." << endl;
 
     AODVRREP *rrep = new AODVRREP("RREP");
-    rrep->setKaynakAdr(hedef);
-    rrep->setHedefAdr(kaynak);
+    rrep->setKaynakAdr(destination);
+    rrep->setHedefAdr(source);
     rrep->setHopCount(guncelHopSayisi);
     rrep->setHedefSeqNo(2); // Sadece ilk RREP tarafından arttırılabilir.
     rrep->addPar("NODE_INDEX");
@@ -464,7 +464,7 @@ void Node::handleRREP(AODVRREP *rrep){
 
     if(rrep != nullptr){
 
-        if (nodeIndex != kaynak) {
+        if (nodeIndex != source) {
 
             EV << "RREP ALINDI.. " << "İLERİ ROTALAMA TABLOSU" << endl << "-------------------------------------" << endl;
             ileriRotalama["kaynak"]      = rrep->getHedefAdr();
@@ -580,7 +580,7 @@ void Node::decreaseBattery(double distance, int sendingMsgType, int payload) {
 }
 
 void Node::checkBattery() {
-    if (battery < (initialBattery * 0.05) && this->nodeIndex != hedef) {
+    if (battery < (initialBattery * 0.05) && this->nodeIndex != destination) {
         isBatteryFull = false;
         getDisplayString().parse("i=block/circle,black;is=vs;t=DIED");
         EV << "Battery Finished : " << this->nodeIndex << endl;
@@ -588,9 +588,9 @@ void Node::checkBattery() {
 }
 
 void Node::sendStatsToBaseStation() {
-    if (nodeIndex != hedef && !Util::isMaliciousNode(zararlilar, nodeIndex)) {
+    if (nodeIndex != destination && !Util::isMaliciousNode(malcsNodes, nodeIndex)) {
         cMessage *stats = new cMessage("STATS");
         stats->addPar("CONSUMED_BATTERY").setDoubleValue(totalConsumedEnergy);
-        this->send(stats, hedef);
+        this->send(stats, destination);
     }
 }

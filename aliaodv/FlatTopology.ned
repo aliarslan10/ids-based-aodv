@@ -19,9 +19,9 @@ network FlatTopology
 {
     parameters:
         int nodeSayisi;
-        string zararlilar;
-        int kaynak;
-        int hedef;
+        string malcsNodes;
+        string sources;
+        int destination;
         int radius;
         int malcsRadius;
         int attackMode;

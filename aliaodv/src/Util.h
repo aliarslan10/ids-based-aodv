@@ -27,6 +27,6 @@ class Util {
         static bool isMaliciousNode(string m, int nodeIndex);
         static vector<int> detectMaliciousNodes(vector<int> neighbors, vector<int> rreqSenders);
         static string vectorToString(vector<int> neighbors);
-        static int randomNumberGenerator(int min, int max);
+        static vector<int> stringToVector(string str);
 };
 #endif /* SRC_UTIL_H_ */

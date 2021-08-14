@@ -37,7 +37,15 @@ bool Util::isMaliciousNode(string malicious, int nodeIndex) {
     return nodeMaliciousStatus;
 }
 
-int Util::randomNumberGenerator(int min, int max) {
-    srand(static_cast <unsigned int> (time(0)));
-    return rand() % max + min;
+vector<int> Util::stringToVector(string str) {
+    vector<int> vector;
+    stringstream strStream(str);
+
+    for (int i; strStream >> i;) {
+        vector.push_back(i);
+        if (strStream.peek() == ',')
+            strStream.ignore();
+    }
+
+    return vector;
 }

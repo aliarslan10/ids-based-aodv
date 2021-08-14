@@ -25,8 +25,8 @@ class Node : public cSimpleModule {
     private:
         int nodeId;
         int nodeIndex;
-        int kaynak;
-        int hedef;
+        int source;
+        int destination;
         int nodeSayisi;
         int radius, malcsRadius;
         int topolojiX;
@@ -39,8 +39,10 @@ class Node : public cSimpleModule {
         int zararliPaketBoyutu;
         int ddosGonderimSayisi;
         int saldiriSayisi = 0;
-        const char* zararlilar;
+        const char* malcsNodes;
         bool isHelloSent = false;
+        string sources;
+        vector<int> sourceVector;
 
         vector<int> komsu;
         vector<int> routes;
